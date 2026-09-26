@@ -32,6 +32,7 @@ import {
   Megaphone,
   MessageCircle,
   MessagesSquare,
+  Orbit,
   Phone,
   PlayCircle,
   ShoppingCart,
@@ -44,6 +45,7 @@ import {
   Trophy,
   Twitter,
   Users,
+  UsersRound,
   X,
   Youtube,
   type LucideIcon
@@ -98,7 +100,11 @@ export const ICONS: Record<string, LucideIcon> = {
   "people-outline": Users,
   "information-circle-outline": Info,
   "megaphone-outline": Megaphone,
-  "trophy-outline": Trophy
+  "trophy-outline": Trophy,
+  // Gen Z pack
+  sparkles: Sparkles,
+  "planet-outline": Orbit,
+  "people-circle-outline": UsersRound
 };
 
 type Palette = Record<string, string>;

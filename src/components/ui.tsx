@@ -7,6 +7,7 @@ import {
   LayoutGrid,
   LogOut,
   Megaphone,
+  Orbit,
   Palette,
   Rows3,
   RotateCcw,
@@ -59,6 +60,7 @@ const NAV = [
   { to: "/features", label: "Screens & features", icon: LayoutGrid },
   { to: "/home-layout", label: "Home layout", icon: Rows3 },
   { to: "/banners", label: "Banners & ads", icon: Megaphone },
+  { to: "/era-tips", label: "Your Era tips", icon: Orbit },
   { to: "/theme", label: "Theme", icon: Palette },
   { to: "/settings", label: "App settings", icon: Settings2 },
   { to: "/history", label: "History", icon: History }

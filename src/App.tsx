@@ -11,6 +11,7 @@ import { BannersPage } from "./pages/BannersPage";
 import { ThemePage } from "./pages/ThemePage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { HistoryPage } from "./pages/HistoryPage";
+import { CycleSyncPage } from "./pages/CycleSyncPage";
 
 /** Pages only render once the config has loaded, so they can assume it's there. */
 const Loaded: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -48,6 +49,7 @@ export const App: React.FC = () => {
           <Route path="features" element={<Loaded><FeaturesPage /></Loaded>} />
           <Route path="home-layout" element={<Loaded><HomeLayoutPage /></Loaded>} />
           <Route path="banners" element={<Loaded><BannersPage /></Loaded>} />
+          <Route path="era-tips" element={<Loaded><CycleSyncPage /></Loaded>} />
           <Route path="theme" element={<Loaded><ThemePage /></Loaded>} />
           <Route path="settings" element={<Loaded><SettingsPage /></Loaded>} />
           <Route path="history" element={<Loaded><HistoryPage /></Loaded>} />

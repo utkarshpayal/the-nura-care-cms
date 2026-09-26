@@ -305,6 +305,43 @@ export const updateBanner = (id: string, input: BannerInput) =>
   send<{ banner: Banner }>("PUT", `/api/cms/banners/${id}`, input);
 export const deleteBanner = (id: string) => send<{ id: string }>("DELETE", `/api/cms/banners/${id}`);
 
+/* ---------------------- Phase Era cycle-syncing tips ---------------------- */
+
+export type CyclePhase = "period" | "follicular" | "ovulation" | "luteal";
+export type TipCategory = "move" | "fuel" | "selfCare" | "vibe";
+
+export type CycleSyncTip = {
+  /** Missing on the built-in defaults (not saved yet). */
+  _id?: string;
+  phase: CyclePhase;
+  category: TipCategory;
+  emoji: string;
+  title: string;
+  body: string;
+  active: boolean;
+  order: number;
+  updatedAt?: string;
+};
+export type TipInput = Omit<CycleSyncTip, "_id" | "updatedAt">;
+
+export type PhaseEra = { name: string; emoji: string; tagline: string; aura: [string, string]; statusEmoji: string };
+
+export type TipsResponse = {
+  tips: CycleSyncTip[];
+  usingDefaults: boolean;
+  phases: CyclePhase[];
+  categories: TipCategory[];
+  categoryLabels: Record<TipCategory, string>;
+  eras: Record<CyclePhase, PhaseEra>;
+};
+
+export const listTips = () => get<TipsResponse>("/api/cms/cycle-sync-tips");
+export const seedTips = () => send<{ tips: CycleSyncTip[] }>("POST", "/api/cms/cycle-sync-tips/seed");
+export const createTip = (input: TipInput) => send<{ tip: CycleSyncTip }>("POST", "/api/cms/cycle-sync-tips", input);
+export const updateTip = (id: string, input: TipInput) =>
+  send<{ tip: CycleSyncTip }>("PUT", `/api/cms/cycle-sync-tips/${id}`, input);
+export const deleteTip = (id: string) => send<{ id: string }>("DELETE", `/api/cms/cycle-sync-tips/${id}`);
+
 export async function uploadImage(file: File): Promise<string> {
   const form = new FormData();
   form.append("file", file);

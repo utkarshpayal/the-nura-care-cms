@@ -1,9 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, ExternalLink, EyeOff, GripVertical, Link2, Plus, RotateCcw, Trash2, Users } from "lucide-react";
-import { CustomTile, EVERYONE, Feature, FeaturePlacement, errorMessage, saveFeatures } from "../lib/api";
+import { useSearchParams } from "react-router-dom";
+import { ArrowDown, ArrowUp, Bell, ChevronDown, ChevronUp, ExternalLink, EyeOff, GripVertical, Link2, Plus, RotateCcw, Trash2, Users } from "lucide-react";
+import { CustomTile, DEFAULT_LAUNCH, EVERYONE, Feature, FeaturePlacement, Launch, LaunchStats, errorMessage, saveFeatures } from "../lib/api";
+import { launchConfirm, launchError, launchPill } from "../lib/launch";
 import { COLOR_LABEL, PLACEMENT_HINT, PLACEMENT_LABEL, resolvePalette } from "../lib/catalog";
 import { isConflict, useCms } from "../lib/store";
-import { PhoneFrame, ScreenFor } from "../components/AppPreview";
+import { PhoneFrame, ScreenFor, ViewAs } from "../components/AppPreview";
+import { LaunchEditor } from "../components/LaunchEditor";
 import { ActionEditor, AudienceEditor, IconPicker, actionError, audienceError, describeAction, describeAudience } from "../components/editors";
 import { PageHeader, SaveBar, Segmented, Switch, useToast } from "../components/ui";
 
@@ -39,17 +42,33 @@ const snapshot = (features: Feature[], links: Link[]) => {
 };
 
 export const FeaturesPage: React.FC = () => {
-  const { config, canManage, applySaved, reload, banners } = useCms();
+  const { config, canManage, applySaved, reload, banners, launchStats } = useCms();
   const toast = useToast();
+  const [params] = useSearchParams();
   const initial = useMemo(() => normalize(config!.features, withLocalIds(config!.customTiles)), [config]);
   const [features, setFeatures] = useState<Feature[]>(initial.features);
   const [links, setLinks] = useState<Link[]>(initial.links);
-  const [open, setOpen] = useState<string | null>(null);
-  const [preview, setPreview] = useState<FeaturePlacement>("home");
+  // ?open=<row id> (from the Launches page) opens that row's editor on its screen.
+  const [open, setOpen] = useState<string | null>(() => params.get("open"));
+  const [preview, setPreview] = useState<FeaturePlacement>(() => {
+    const id = params.get("open");
+    return (
+      initial.features.find((f) => f.key === id)?.placement ??
+      initial.links.find((l) => `link:${l.localId}` === id)?.placement ??
+      "home"
+    );
+  });
   const [mode, setMode] = useState<"light" | "dark">("light");
+  const [viewAs, setViewAs] = useState<ViewAs>("others");
   const [saving, setSaving] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
+
+  // Arriving from the Launches page: bring the opened row into view.
+  useEffect(() => {
+    const id = params.get("open");
+    if (id) document.getElementById(`row-${id}`)?.scrollIntoView({ block: "center" });
+  }, []);
 
   // A reload (e.g. after a conflict) replaces the draft with the saved state.
   useEffect(() => {
@@ -114,7 +133,8 @@ export const FeaturesPage: React.FC = () => {
         enabled: true,
         badge: null,
         action: { type: "url", value: "https://", fallbackUrl: null },
-        audience: EVERYONE
+        audience: EVERYONE,
+        launch: DEFAULT_LAUNCH
       }
     ]);
     setOpen(`link:${localId}`);
@@ -137,14 +157,19 @@ export const FeaturesPage: React.FC = () => {
       audience: EVERYONE
     });
 
+  const savedLaunchOf = (id: string): Launch | undefined =>
+    id.startsWith("link:")
+      ? initial.links.find((l) => `link:${l.localId}` === id)?.launch
+      : initial.features.find((f) => f.key === id)?.launch;
+
   const problem = (() => {
     for (const l of links) {
       if (!l.title.trim()) return "Every link tile needs a title";
-      const e = actionError(l.action) ?? audienceError(l.audience);
+      const e = actionError(l.action) ?? audienceError(l.audience) ?? launchError(l.launch, savedLaunchOf(`link:${l.localId}`));
       if (e) return `${l.title}: ${e}`;
     }
     for (const f of features) {
-      const e = audienceError(f.audience);
+      const e = audienceError(f.audience) ?? launchError(f.launch, savedLaunchOf(f.key));
       if (e) return `${f.title}: ${e}`;
     }
     return null;
@@ -152,6 +177,12 @@ export const FeaturesPage: React.FC = () => {
 
   const handleSave = async () => {
     if (problem) return toast("error", problem);
+    // Launching to everyone, or taking a feature away from people, is confirmed first.
+    const confirms = [
+      ...features.map((f) => { const s = savedLaunchOf(f.key); return s ? launchConfirm(f.title, s, f.launch) : null; }),
+      ...links.map((l) => { const s = savedLaunchOf(`link:${l.localId}`); return s ? launchConfirm(l.title, s, l.launch) : null; })
+    ].filter(Boolean);
+    if (confirms.length && !window.confirm(`${confirms.join("\n\n")}\n\nPublish now?`)) return;
     setSaving(true);
     try {
       const n = normalize(features, links);
@@ -231,10 +262,14 @@ export const FeaturesPage: React.FC = () => {
                     const colorKey = it.kind === "feature" ? it.feature.colorKey : it.link.colorKey;
                     const badge = it.kind === "feature" ? it.feature.badge : it.link.badge;
                     const audience = it.kind === "feature" ? it.feature.audience : it.link.audience;
+                    const launch = it.kind === "feature" ? it.feature.launch : it.link.launch;
+                    const pill = launchPill(launch);
+                    const stats = launchStats[it.kind === "feature" ? it.feature.key : `link:${it.link.id}`];
                     const who = describeAudience(audience);
                     return (
                       <li
                         key={it.id}
+                        id={`row-${it.id}`}
                         className={`feature-row ${enabled ? "" : "is-hidden"} ${isOpen ? "is-open" : ""} ${dragId === it.id ? "is-dragging" : ""} ${dropTarget === it.id ? "is-drop-before" : ""}`}
                         onDragOver={allowDrop(it.id)}
                         onDrop={onDropAt(p, it.id)}
@@ -256,6 +291,7 @@ export const FeaturesPage: React.FC = () => {
                               {it.kind === "link" && <Link2 size={12} className="kind-icon" />}
                               {title}
                               {badge && <em className="badge">{badge}</em>}
+                              {pill && <em className={`pill launch-pill ${pill.cls}`}>{pill.text}</em>}
                             </strong>
                             <span>
                               {enabled ? (
@@ -277,6 +313,12 @@ export const FeaturesPage: React.FC = () => {
                                   <Users size={10} /> {who}
                                 </>
                               )}
+                              {launch.state !== "live" && stats?.waiting ? (
+                                <>
+                                  {" · "}
+                                  <Bell size={10} /> {stats.waiting.toLocaleString()} waiting
+                                </>
+                              ) : null}
                             </span>
                           </button>
                           <Switch
@@ -293,6 +335,8 @@ export const FeaturesPage: React.FC = () => {
                         {isOpen && it.kind === "feature" && (
                           <FeatureEditor
                             feature={it.feature}
+                            savedLaunch={savedLaunchOf(it.id)}
+                            stats={launchStats[it.feature.key]}
                             colorKeys={catalog.tileColorKeys}
                             onChange={(patch) => updateFeature(it.feature.key, patch)}
                             onMove={(to) => moveTo(it.id, to)}
@@ -302,6 +346,8 @@ export const FeaturesPage: React.FC = () => {
                         {isOpen && it.kind === "link" && (
                           <LinkEditor
                             link={it.link}
+                            savedLaunch={savedLaunchOf(it.id)}
+                            stats={it.link.id ? launchStats[`link:${it.link.id}`] : undefined}
                             colorKeys={catalog.tileColorKeys}
                             icons={catalog.tileIcons}
                             actions={catalog.tileActions}
@@ -335,10 +381,26 @@ export const FeaturesPage: React.FC = () => {
             </select>
             <Segmented label="Preview mode" value={mode} onChange={setMode} options={[{ value: "light", label: "Light" }, { value: "dark", label: "Dark" }]} />
           </div>
+          <div className="preview-controls">
+            <span className="muted small">Preview as</span>
+            <Segmented
+              label="Preview as"
+              value={viewAs}
+              onChange={setViewAs}
+              options={[
+                { value: "others", label: "Everyone else" },
+                { value: "access", label: "Has access" }
+              ]}
+            />
+          </div>
           <PhoneFrame palette={palette}>
-            <ScreenFor placement={preview} features={features} links={links} banners={banners} palette={palette} sections={config!.homeSections} mode={mode} />
+            <ScreenFor placement={preview} features={features} links={links} banners={banners} palette={palette} sections={config!.homeSections} mode={mode} viewAs={viewAs} />
           </PhoneFrame>
-          <p className="muted small center">Preview of your unsaved changes, as everyone sees them.</p>
+          <p className="muted small center">
+            {viewAs === "others"
+              ? "Your unsaved changes, as most people see them. Tap a locked tile to see its sheet."
+              : "Your unsaved changes, as testers and people in a rollout see them."}
+          </p>
         </aside>
       </div>
 
@@ -393,13 +455,17 @@ const StyleFields: React.FC<{
   </>
 );
 
-const FeatureEditor: React.FC<{
-  feature: Feature;
-  colorKeys: string[];
-  onChange: (patch: Partial<Feature>) => void;
-  onMove: (p: FeaturePlacement) => void;
-  onReset: () => void;
-}> = ({ feature: f, colorKeys, onChange, onMove, onReset }) => (
+type LaunchProps = { savedLaunch?: Launch; stats?: LaunchStats[string] };
+
+const FeatureEditor: React.FC<
+  {
+    feature: Feature;
+    colorKeys: string[];
+    onChange: (patch: Partial<Feature>) => void;
+    onMove: (p: FeaturePlacement) => void;
+    onReset: () => void;
+  } & LaunchProps
+> = ({ feature: f, colorKeys, onChange, onMove, onReset, savedLaunch, stats }) => (
   <div className="feature-edit">
     <div className="field-row">
       <label className="field">
@@ -413,6 +479,7 @@ const FeatureEditor: React.FC<{
       <input value={f.description} maxLength={80} placeholder={f.defaults.description} onChange={(e) => onChange({ description: e.target.value })} />
     </label>
     <StyleFields size={f.size} colorKey={f.colorKey} badge={f.badge} colorKeys={colorKeys} onChange={onChange} />
+    <LaunchEditor value={f.launch} saved={savedLaunch} stats={stats} description={f.description} onChange={(launch) => onChange({ launch })} />
     <AudienceEditor value={f.audience} onChange={(audience) => onChange({ audience })} />
     <div className="feature-edit-foot">
       <span className="muted small">
@@ -425,15 +492,17 @@ const FeatureEditor: React.FC<{
   </div>
 );
 
-const LinkEditor: React.FC<{
-  link: Link;
-  colorKeys: string[];
-  icons: string[];
-  actions: CustomTile["action"]["type"][];
-  onChange: (patch: Partial<Link>) => void;
-  onMove: (p: FeaturePlacement) => void;
-  onRemove: () => void;
-}> = ({ link: l, colorKeys, icons, actions, onChange, onMove, onRemove }) => (
+const LinkEditor: React.FC<
+  {
+    link: Link;
+    colorKeys: string[];
+    icons: string[];
+    actions: CustomTile["action"]["type"][];
+    onChange: (patch: Partial<Link>) => void;
+    onMove: (p: FeaturePlacement) => void;
+    onRemove: () => void;
+  } & LaunchProps
+> = ({ link: l, colorKeys, icons, actions, onChange, onMove, onRemove, savedLaunch, stats }) => (
   <div className="feature-edit">
     <div className="field-row">
       <label className="field">
@@ -449,6 +518,7 @@ const LinkEditor: React.FC<{
     <ActionEditor value={l.action} allowed={actions} onChange={(action) => onChange({ action })} />
     <IconPicker value={l.icon} icons={icons} onChange={(icon) => onChange({ icon })} />
     <StyleFields size={l.size} colorKey={l.colorKey} badge={l.badge} colorKeys={colorKeys} onChange={onChange} />
+    <LaunchEditor value={l.launch} saved={savedLaunch} stats={stats} description={l.description ?? ""} onChange={(launch) => onChange({ launch })} />
     <AudienceEditor value={l.audience} onChange={(audience) => onChange({ audience })} />
     <div className="feature-edit-foot">
       <span className="muted small">{describeAction(l.action)}</span>

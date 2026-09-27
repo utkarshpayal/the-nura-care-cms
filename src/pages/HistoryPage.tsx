@@ -19,7 +19,12 @@ const summarize = (r: Revision) => {
     case "features": {
       const hidden = (d.features ?? []).filter((f: any) => f.enabled === false).length;
       const links = (d.customTiles ?? []).length;
-      return `${hidden} feature${hidden === 1 ? "" : "s"} hidden · ${links} link tile${links === 1 ? "" : "s"}`;
+      const all = [...(d.features ?? []), ...(d.customTiles ?? [])];
+      const count = (state: string) => all.filter((f: any) => f.launch?.state === state).length;
+      const launch = [["coming_soon", "coming soon"], ["rolling_out", "rolling out"], ["paused", "paused"]]
+        .map(([k, label]) => (count(k) ? `${count(k)} ${label}` : null))
+        .filter(Boolean);
+      return [`${hidden} feature${hidden === 1 ? "" : "s"} hidden`, `${links} link tile${links === 1 ? "" : "s"}`, ...launch].join(" · ");
     }
     case "homeSections": {
       const hidden = (d.homeSections ?? []).filter((s: any) => s.visible === false).length;

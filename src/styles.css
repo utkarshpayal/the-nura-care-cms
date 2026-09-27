@@ -525,3 +525,59 @@ textarea { width: 100%; resize: vertical; }
 .icon-btn.danger:hover:not(:disabled) { color: var(--danger); border-color: var(--danger-line); }
 .drawer-narrow { width: min(560px, 100%); }
 .drawer-narrow .drawer-body { display: block; }
+
+/* ============================== Launch states ============================== */
+/* Row pills: SOON amber, ROLLOUT violet, PAUSED red (docs/launch-states.md §5.1). */
+.pill-soon { background: var(--amber-tint); color: var(--amber-dark); }
+.pill-rollout { background: var(--accent-tint); color: var(--accent-dark); }
+.pill-paused { background: var(--danger-tint); color: var(--danger-dark); }
+.launch-pill { margin-left: 6px; padding: 1px 7px; font-size: 0.62rem; letter-spacing: 0.02em; vertical-align: middle; }
+.btn.sm { padding: 6px 12px; font-size: 0.8rem; }
+
+.launch-edit { border-style: solid; border-color: var(--accent-line); background: var(--surface-2); }
+.launch-edit .segmented { justify-self: start; }
+.launch-block { display: grid; gap: 10px; padding-top: 4px; }
+.launch-block input[type="range"] { width: 100%; accent-color: var(--accent); }
+.launch-block .audience { background: var(--surface); }
+.launch-percent { color: var(--accent-dark); }
+.launch-sub { margin: 0; font-size: 0.74rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-4); }
+.launch-notify { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.launch-stats { display: inline-flex; align-items: center; gap: 4px; }
+.launch-foot { display: grid; gap: 2px; }
+.field textarea { resize: vertical; font-family: inherit; }
+
+.tester-box { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 6px; border: 1px solid var(--line-strong); border-radius: 11px; background: var(--surface); }
+.tester-box input { flex: 1; min-width: 160px; border: none !important; box-shadow: none !important; padding: 4px 6px !important; }
+.tester-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 4px 3px 10px; border-radius: 999px; background: var(--accent-tint); color: var(--accent-dark); font-size: 0.78rem; font-weight: 700; }
+.tester-chip.is-new { background: var(--line-2); color: var(--ink-3); border: 1px dashed var(--line-strong); }
+.tester-chip button { display: grid; place-items: center; width: 18px; height: 18px; border: none; border-radius: 50%; background: none; color: inherit; cursor: pointer; }
+.tester-chip button:hover { background: rgba(0, 0, 0, 0.06); }
+
+/* Launches page */
+.launch-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.launch-item { padding: 12px 0; border-top: 1px solid var(--line-2); }
+.launch-item:first-child { border-top: none; }
+.launch-item-main { display: flex; gap: 14px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
+.launch-item-title { display: grid; gap: 3px; min-width: 0; flex: 1 1 280px; }
+.launch-item-title strong { font-size: 0.95rem; }
+.launch-item-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.launch-warning { display: inline-flex; align-items: center; gap: 5px; font-weight: 700; }
+.launch-pause { margin: 10px 0 0; }
+.launch-pause select { padding: 8px 11px; border-radius: 11px; border: 1px solid var(--line-strong); background: var(--surface); font-size: 0.88rem; min-width: 260px; max-width: 100%; }
+
+/* Phone preview: locked / beta / paused tiles and the sheet */
+.phone-screen { position: relative; }
+.pv-tile.is-locked .pv-tile-icon, .pv-tile.is-locked .pv-tile-text, .pv-shortcut.is-locked .pv-shortcut-icon > svg { opacity: 0.55; }
+.pv-tile.is-tappable, .pv-shortcut.is-tappable { cursor: pointer; }
+.pv-soon-pill { display: inline-flex; align-items: center; gap: 2px; }
+.pv-pause-dot { position: absolute; top: 6px; right: 6px; width: 11px; height: 11px; border-radius: 50%; border: 1.5px solid; display: grid; place-items: center; color: #fff; z-index: 1; }
+.pv-shortcut-icon .pv-pause-dot { top: -3px; right: -3px; }
+.pv-sheet-overlay { position: absolute; inset: 0; background: rgba(30, 24, 35, 0.45); display: flex; align-items: flex-end; z-index: 3; }
+.pv-sheet { width: 100%; border-radius: 20px 20px 0 0; padding: 8px 18px 20px; display: grid; justify-items: center; gap: 6px; text-align: center; }
+.pv-sheet-grip { width: 30px; height: 3px; border-radius: 3px; margin-bottom: 8px; }
+.pv-sheet-icon { width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center; }
+.pv-sheet strong { font-family: var(--font-display); font-size: 0.88rem; }
+.pv-sheet em { font-style: normal; font-size: 0.66rem; font-weight: 800; }
+.pv-sheet p { margin: 0; font-size: 0.62rem; line-height: 1.4; }
+.pv-sheet-btn { display: inline-flex; align-items: center; justify-content: center; gap: 4px; width: 100%; margin-top: 6px; padding: 7px; border-radius: 999px; font-size: 0.64rem; font-weight: 800; }
+.pv-sheet-close { font-size: 0.62rem; font-weight: 700; cursor: pointer; }

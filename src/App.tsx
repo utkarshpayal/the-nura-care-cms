@@ -12,6 +12,7 @@ import { ThemePage } from "./pages/ThemePage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { HistoryPage } from "./pages/HistoryPage";
 import { CycleSyncPage } from "./pages/CycleSyncPage";
+import { LaunchesPage } from "./pages/LaunchesPage";
 
 /** Pages only render once the config has loaded, so they can assume it's there. */
 const Loaded: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -47,6 +48,7 @@ export const App: React.FC = () => {
         <Route element={<AppLayout />}>
           <Route index element={<Loaded><OverviewPage /></Loaded>} />
           <Route path="features" element={<Loaded><FeaturesPage /></Loaded>} />
+          <Route path="launches" element={<Loaded><LaunchesPage /></Loaded>} />
           <Route path="home-layout" element={<Loaded><HomeLayoutPage /></Loaded>} />
           <Route path="banners" element={<Loaded><BannersPage /></Loaded>} />
           <Route path="era-tips" element={<Loaded><CycleSyncPage /></Loaded>} />

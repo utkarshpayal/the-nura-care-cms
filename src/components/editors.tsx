@@ -29,14 +29,19 @@ export const audienceError = (a: Audience) => {
   return null;
 };
 
-export const AudienceEditor: React.FC<{ value: Audience; onChange: (a: Audience) => void }> = ({ value, onChange }) => {
+export const AudienceEditor: React.FC<{ value: Audience; onChange: (a: Audience) => void; legend?: string; hint?: string }> = ({
+  value,
+  onChange,
+  legend = "Who sees it",
+  hint = "Older app builds that don't understand targeting show the item to everyone."
+}) => {
   const set = (patch: Partial<Audience>) => onChange({ ...value, ...patch });
   const togglePlatform = (p: AudiencePlatform) =>
     set({ platforms: value.platforms.includes(p) ? value.platforms.filter((x) => x !== p) : [...value.platforms, p] });
   const err = audienceError(value);
   return (
     <fieldset className="audience">
-      <legend>Who sees it</legend>
+      <legend>{legend}</legend>
       <div className="field-row">
         <label className="field">
           <span>People</span>
@@ -69,7 +74,7 @@ export const AudienceEditor: React.FC<{ value: Audience; onChange: (a: Audience)
           <input value={value.maxAppVersion ?? ""} placeholder="any" onChange={(e) => set({ maxAppVersion: e.target.value.trim() || null })} className={value.maxAppVersion && !VERSION.test(value.maxAppVersion) ? "is-invalid" : ""} />
         </label>
       </div>
-      {err ? <small className="warn">{err}</small> : <small className="muted">Older app builds that don't understand targeting show the item to everyone.</small>}
+      {err ? <small className="warn">{err}</small> : <small className="muted">{hint}</small>}
     </fieldset>
   );
 };

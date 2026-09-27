@@ -1,6 +1,6 @@
 // Launch states (docs/launch-states.md): labels, validation, recipes and the
 // warnings shared by Screens & features, Launches, Overview and Banners.
-import { CustomTile, DEFAULT_LAUNCH, EVERYONE, Feature, Launch, LaunchHeadline, LaunchState } from "./api";
+import { CustomTile, DEFAULT_LAUNCH, EVERYONE, Feature, Launch, LaunchHeadline, LaunchState, TapAction } from "./api";
 import { actionError, audienceError } from "../components/editors";
 
 export const LAUNCH_STATES: { value: LaunchState; label: string }[] = [
@@ -183,11 +183,22 @@ export type LaunchItem = {
   placement: Feature["placement"];
   enabled: boolean;
   route: string | null;
+  /** A link tile with no tap action: a Coming soon teaser that can't go live. */
+  teaser: boolean;
   launch: Launch;
 };
 
+/**
+ * A link tile with no tap action teases something that isn't in the app
+ * yet. It can only be Coming soon, unscheduled (the backend enforces the same).
+ */
+export const teaserError = (action: TapAction, l: Launch) =>
+  action.type === "none" && (l.state !== "coming_soon" || l.soon.goLiveAt)
+    ? "Give it a tap action before it can roll out, go live or be scheduled"
+    : null;
+
 export const launchItems = (features: Feature[], tiles: CustomTile[]): LaunchItem[] => [
-  ...features.map((f) => ({ itemKey: f.key, rowId: f.key, kind: "feature" as const, title: f.title, placement: f.placement, enabled: f.enabled, route: f.route, launch: f.launch })),
+  ...features.map((f) => ({ itemKey: f.key, rowId: f.key, kind: "feature" as const, title: f.title, placement: f.placement, enabled: f.enabled, route: f.route, teaser: false, launch: f.launch })),
   ...tiles.map((t) => ({
     itemKey: `link:${t.id}`,
     rowId: t.id ? `link:${t.id}` : null,
@@ -196,6 +207,7 @@ export const launchItems = (features: Feature[], tiles: CustomTile[]): LaunchIte
     placement: t.placement,
     enabled: t.enabled,
     route: null,
+    teaser: t.action.type === "none",
     launch: t.launch
   }))
 ];

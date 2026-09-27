@@ -84,6 +84,8 @@ type CmsState = {
   error: string | null;
   canManage: boolean;
   reload: () => Promise<void>;
+  /** Refetch just the launch stats (after an announcement, say). */
+  reloadStats: () => Promise<void>;
   /** Merge a save response (features/home/theme + new version) into the loaded config. */
   applySaved: (saved: Partial<CmsConfig>) => void;
   setBanners: React.Dispatch<React.SetStateAction<Banner[]>>;
@@ -99,6 +101,14 @@ export const CmsProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const reloadStats = useCallback(
+    () =>
+      getLaunchStats()
+        .then((r) => setLaunchStats(r.stats ?? {}))
+        .catch(() => undefined),
+    []
+  );
+
   const reload = useCallback(async () => {
     setError(null);
     try {
@@ -106,15 +116,13 @@ export const CmsProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setConfig(c);
       setBanners(b.banners);
       // Stats are extra: a failure here must not block the editors.
-      getLaunchStats()
-        .then((r) => setLaunchStats(r.stats ?? {}))
-        .catch(() => undefined);
+      reloadStats();
     } catch (err) {
       setError(errorMessage(err, "Couldn't load the app config."));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [reloadStats]);
 
   useEffect(() => {
     reload();
@@ -125,8 +133,8 @@ export const CmsProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const value = useMemo(
-    () => ({ config, banners, launchStats, loading, error, canManage: canManage(permissions), reload, applySaved, setBanners }),
-    [config, banners, launchStats, loading, error, permissions, reload, applySaved]
+    () => ({ config, banners, launchStats, loading, error, canManage: canManage(permissions), reload, reloadStats, applySaved, setBanners }),
+    [config, banners, launchStats, loading, error, permissions, reload, reloadStats, applySaved]
   );
   return <CmsContext.Provider value={value}>{children}</CmsContext.Provider>;
 };

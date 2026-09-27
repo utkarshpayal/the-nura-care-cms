@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ArrowDown, ArrowUp, Bell, ChevronDown, ChevronUp, ExternalLink, EyeOff, GripVertical, Link2, Plus, RotateCcw, Trash2, Users } from "lucide-react";
 import { CustomTile, DEFAULT_LAUNCH, EVERYONE, Feature, FeaturePlacement, Launch, LaunchStats, errorMessage, saveFeatures } from "../lib/api";
-import { launchConfirm, launchError, launchPill } from "../lib/launch";
+import { launchConfirm, launchError, launchPill, teaserError } from "../lib/launch";
 import { COLOR_LABEL, PLACEMENT_HINT, PLACEMENT_LABEL, resolvePalette } from "../lib/catalog";
 import { isConflict, useCms } from "../lib/store";
 import { PhoneFrame, ScreenFor, ViewAs } from "../components/AppPreview";
@@ -165,7 +165,11 @@ export const FeaturesPage: React.FC = () => {
   const problem = (() => {
     for (const l of links) {
       if (!l.title.trim()) return "Every link tile needs a title";
-      const e = actionError(l.action) ?? audienceError(l.audience) ?? launchError(l.launch, savedLaunchOf(`link:${l.localId}`));
+      const e =
+        actionError(l.action) ??
+        teaserError(l.action, l.launch) ??
+        audienceError(l.audience) ??
+        launchError(l.launch, savedLaunchOf(`link:${l.localId}`));
       if (e) return `${l.title}: ${e}`;
     }
     for (const f of features) {
@@ -515,7 +519,15 @@ const LinkEditor: React.FC<
       <span>Description</span>
       <input value={l.description ?? ""} maxLength={80} placeholder="One short line" onChange={(e) => onChange({ description: e.target.value })} />
     </label>
-    <ActionEditor value={l.action} allowed={actions} onChange={(action) => onChange({ action })} />
+    <ActionEditor
+      value={l.action}
+      // "Nothing yet" makes a teaser for something not in the app: only while it's Coming soon.
+      allowed={l.launch.state === "coming_soon" ? ["none", ...actions] : actions}
+      onChange={(action) => onChange({ action })}
+    />
+    {l.action.type === "none" && (
+      <small className="muted">A teaser: people see it locked and can tap “Notify me”. Give it a tap action before launching it.</small>
+    )}
     <IconPicker value={l.icon} icons={icons} onChange={(icon) => onChange({ icon })} />
     <StyleFields size={l.size} colorKey={l.colorKey} badge={l.badge} colorKeys={colorKeys} onChange={onChange} />
     <LaunchEditor value={l.launch} saved={savedLaunch} stats={stats} description={l.description ?? ""} onChange={(launch) => onChange({ launch })} />

@@ -92,7 +92,18 @@ const launchPayload = ({ since: _s, testers, soon, paused, ...l }: Launch) => ({
 });
 
 /** Stats key: the feature key, or `link:<id>` for a link tile. */
-export type LaunchStats = Record<string, { waiting: number; lockedTaps: number }>;
+export type LaunchStats = Record<
+  string,
+  {
+    waiting: number;
+    /** Sign-ups with an account that haven't had the "It's here" push yet. */
+    toNotify: number;
+    /** Signed-out sign-ups: a push can't reach them. */
+    deviceOnly: number;
+    lastNotifiedAt: string | null;
+    lockedTaps: number;
+  }
+>;
 
 export type WaitlistEntry = {
   createdAt: string;
@@ -360,6 +371,13 @@ export const saveFeatures = (version: number, features: Feature[], customTiles: 
   });
 
 export const getLaunchStats = () => get<{ stats: LaunchStats }>("/api/cms/launches");
+/** Push "It's here" to a launched item's waitlist (people with an account, not told yet). */
+export const announceLaunch = (itemKey: string, message: { title: string; body: string }) =>
+  send<{ broadcastId: string; recipients: number; withPush: number; remaining: number }>(
+    "POST",
+    `/api/cms/launches/${encodeURIComponent(itemKey)}/announce`,
+    message
+  );
 export const getWaitlist = (itemKey: string) =>
   get<{ entries: WaitlistEntry[] }>(`/api/cms/launches/${encodeURIComponent(itemKey)}/waitlist`);
 

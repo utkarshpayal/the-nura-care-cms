@@ -299,13 +299,27 @@ export const TileGrid: React.FC<{ tiles: PreviewTile[]; palette: Palette }> = ({
 export const liveBannersIn = (banners: Partial<Banner>[], placement: string) =>
   banners.filter((b) => b.placement === placement && b.status === "live").sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
 
+/** Home / Profile shortcuts: rows of four round icons with labels, no box or heading (same as the app). */
 const Shortcuts: React.FC<{ tiles: PreviewTile[]; palette: Palette }> = ({ tiles, palette }) =>
   tiles.length === 0 ? null : (
-    <div>
-      <div className="pv-section-title" style={{ color: palette.foreground }}>
-        Shortcuts
-      </div>
-      <TileGrid tiles={tiles} palette={palette} />
+    <div className="pv-shortcuts">
+      {tiles.map((tile) => {
+        const Icon = ICONS[tile.icon] ?? Sparkles;
+        const { fg, bg } = tint(palette, tile.colorKey);
+        return (
+          <div key={tile.key} className="pv-shortcut">
+            <span className="pv-shortcut-icon" style={{ background: bg, color: fg }}>
+              <Icon size={14} />
+              {tile.badge && (
+                <em className="pv-shortcut-badge" style={{ background: palette.primary, color: palette.buttonText, borderColor: palette.background }}>
+                  {tile.badge}
+                </em>
+              )}
+            </span>
+            <span style={{ color: palette.foreground }}>{tile.title}</span>
+          </div>
+        );
+      })}
     </div>
   );
 

@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle, Bell, Download, Link2, Loader2, MousePointerClick, Pause, Pencil, Play, Plus, Rocket } from "lucide-react";
-import { Banner, Feature, Launch, WaitlistEntry, errorMessage, getWaitlist, saveFeatures } from "../lib/api";
+import { AlertTriangle, Bell, Download, Link2, Loader2, Megaphone, MousePointerClick, Pause, Pencil, Play, Plus, Rocket } from "lucide-react";
+import { Banner, Feature, Launch, WaitlistEntry, announceLaunch, errorMessage, getWaitlist, saveFeatures } from "../lib/api";
 import { PLACEMENT_LABEL, relativeTime, staffName } from "../lib/catalog";
 import {
   LaunchItem,
@@ -66,10 +66,12 @@ const downloadCsv = (title: string, entries: WaitlistEntry[]) => {
 };
 
 export const LaunchesPage: React.FC = () => {
-  const { config, banners, launchStats, canManage, applySaved, reload } = useCms();
+  const { config, banners, launchStats, canManage, applySaved, reload, reloadStats } = useCms();
   const toast = useToast();
   const [busy, setBusy] = useState<string | null>(null);
   const [pauseKey, setPauseKey] = useState("");
+  /** The item whose "It's here" push is being written, and its draft. */
+  const [announcing, setAnnouncing] = useState<{ itemKey: string; title: string; body: string } | null>(null);
   const c = config!;
 
   const items = useMemo(() => launchItems(c.features, c.customTiles), [c]);
@@ -78,9 +80,42 @@ export const LaunchesPage: React.FC = () => {
     coming_soon: items.filter((i) => i.launch.state === "coming_soon"),
     rolling_out: items.filter((i) => i.launch.state === "rolling_out"),
     paused: items.filter((i) => i.launch.state === "paused"),
-    recent: items.filter((i) => i.launch.state === "live" && i.launch.since && ageMs(i.launch.since) < RECENT_DAYS * DAY)
+    // Also any live item whose waitlist still has people to tell (e.g. sign-ups that got an account later).
+    recent: items.filter(
+      (i) =>
+        i.launch.state === "live" &&
+        ((i.launch.since && ageMs(i.launch.since) < RECENT_DAYS * DAY) || (launchStats[i.itemKey]?.toNotify ?? 0) > 0)
+    )
   };
   const liveItems = items.filter((i) => i.launch.state === "live" && i.enabled);
+
+  const startAnnouncing = (item: LaunchItem) =>
+    setAnnouncing({
+      itemKey: item.itemKey,
+      title: `It’s here: ${item.title}`.slice(0, 100),
+      body: "You asked us to tell you when it’s ready. Tap to try it now."
+    });
+
+  const sendAnnouncement = async () => {
+    if (!announcing) return;
+    const n = launchStats[announcing.itemKey]?.toNotify ?? 0;
+    if (!window.confirm(`Send this push to ${n.toLocaleString()} ${n === 1 ? "person" : "people"}? It can't be unsent.`)) return;
+    setBusy(`announce:${announcing.itemKey}`);
+    try {
+      const r = await announceLaunch(announcing.itemKey, { title: announcing.title.trim(), body: announcing.body.trim() });
+      toast(
+        "success",
+        `Telling ${r.recipients.toLocaleString()} ${r.recipients === 1 ? "person" : "people"} (${r.withPush.toLocaleString()} with push on; everyone gets it in their app inbox).` +
+          (r.remaining ? ` ${r.remaining.toLocaleString()} more to go — send again for the rest.` : "")
+      );
+      setAnnouncing(null);
+      await reloadStats();
+    } catch (err) {
+      toast("error", errorMessage(err, "Couldn't send the announcement."));
+    } finally {
+      setBusy(null);
+    }
+  };
 
   /** Publish one item's new launch straight away (a normal features save of the whole list). */
   const publish = async (item: LaunchItem, next: Launch, question: string, done: string) => {
@@ -91,6 +126,8 @@ export const LaunchesPage: React.FC = () => {
       const tiles = c.customTiles.map((t) => (`link:${t.id}` === item.itemKey ? { ...t, launch: next } : t));
       applySaved(await saveFeatures(c.sectionVersions.features, features, tiles));
       toast("success", `${done} The app picks it up on its next refresh.`);
+      // Just launched with people waiting: offer the "It's here" push right away.
+      if (next.state === "live" && item.launch.state !== "live" && (launchStats[item.itemKey]?.toNotify ?? 0) > 0) startAnnouncing(item);
     } catch (err) {
       if (isConflict(err)) {
         toast("error", errorMessage(err));
@@ -118,7 +155,13 @@ export const LaunchesPage: React.FC = () => {
     const l = item.launch;
     const t = item.title;
     const launch = (
-      <button type="button" className="btn btn-primary sm" onClick={() => publish(item, withState(l, "live"), `Launch “${t}” to everyone in its audience?`, `${t} is live.`)}>
+      <button
+        type="button"
+        className="btn btn-primary sm"
+        disabled={item.teaser}
+        title={item.teaser ? "Give it a tap action in Screens & features first" : undefined}
+        onClick={() => publish(item, withState(l, "live"), `Launch “${t}” to everyone in its audience?`, `${t} is live.`)}
+      >
         <Rocket size={14} /> Launch
       </button>
     );
@@ -138,6 +181,8 @@ export const LaunchesPage: React.FC = () => {
             <button
               type="button"
               className="btn btn-ghost sm"
+              disabled={item.teaser}
+              title={item.teaser ? "Give it a tap action in Screens & features first" : undefined}
               onClick={() => publish(item, withState(l, "rolling_out"), `Start rolling out “${t}” to ${l.rollout.percent}% of users?`, `${t} is rolling out.`)}
             >
               <Play size={14} /> Start rollout ({l.rollout.percent}%)
@@ -187,7 +232,16 @@ export const LaunchesPage: React.FC = () => {
           </button>
         );
       default:
-        return pause;
+        return (
+          <>
+            {(launchStats[item.itemKey]?.toNotify ?? 0) > 0 && announcing?.itemKey !== item.itemKey && (
+              <button type="button" className="btn btn-primary sm" onClick={() => startAnnouncing(item)}>
+                <Megaphone size={14} /> Tell {launchStats[item.itemKey].toNotify.toLocaleString()} it’s here
+              </button>
+            )}
+            {pause}
+          </>
+        );
     }
   };
 
@@ -223,8 +277,10 @@ export const LaunchesPage: React.FC = () => {
             {stats && (stats.waiting > 0 || stats.lockedTaps > 0) && (
               <span className="muted small launch-stats">
                 <Bell size={11} /> {stats.waiting.toLocaleString()} waiting · <MousePointerClick size={11} /> {stats.lockedTaps.toLocaleString()} locked taps
+                {stats.lastNotifiedAt && ` · told ${relativeTime(stats.lastNotifiedAt)}`}
               </span>
             )}
+            {item.teaser && <span className="muted small">Teaser: no tap action yet, so it can't launch.</span>}
             {warnings.map((w) => (
               <span key={w} className="small warn launch-warning">
                 <AlertTriangle size={12} /> {w}
@@ -246,6 +302,40 @@ export const LaunchesPage: React.FC = () => {
             )}
           </div>
         </div>
+        {announcing?.itemKey === item.itemKey && stats && (
+          <div className="announce">
+            <p className="launch-sub">
+              <Megaphone size={13} /> Tell the waitlist it’s here
+            </p>
+            <label className="field">
+              <span>Title</span>
+              <input value={announcing.title} maxLength={100} onChange={(e) => setAnnouncing({ ...announcing, title: e.target.value })} />
+            </label>
+            <label className="field">
+              <span>Message</span>
+              <textarea rows={2} value={announcing.body} maxLength={500} onChange={(e) => setAnnouncing({ ...announcing, body: e.target.value })} />
+            </label>
+            <small className="muted">
+              Goes to {stats.toNotify.toLocaleString()} {stats.toNotify === 1 ? "person" : "people"} with an account, as a push and in their app inbox, and
+              opens {item.route || item.kind === "link" ? "the feature" : "the app"}.
+              {stats.deviceOnly > 0 &&
+                ` ${stats.deviceOnly.toLocaleString()} signed-out sign-up${stats.deviceOnly === 1 ? "" : "s"} can't get a push; they'll see it live in the app.`}
+            </small>
+            <div className="toolbar">
+              <button
+                type="button"
+                className="btn btn-primary sm"
+                disabled={Boolean(busy) || !announcing.title.trim() || !announcing.body.trim()}
+                onClick={sendAnnouncement}
+              >
+                <Megaphone size={14} /> Send to {stats.toNotify.toLocaleString()}
+              </button>
+              <button type="button" className="btn btn-ghost sm" onClick={() => setAnnouncing(null)}>
+                Not now
+              </button>
+            </div>
+          </div>
+        )}
       </li>
     );
   };

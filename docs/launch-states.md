@@ -342,6 +342,8 @@ type Launch = {
 };
 ```
 
+**Teaser tiles.** A link tile's tap action may be `none` (the CMS calls it "Nothing"). That's how you tease something that isn't in the app yet. It's only allowed while the tile is `coming_soon` with no `goLiveAt`: anything else gets `400 "… needs a tap action before it can go live"`. The app never shows a no-action tile as open.
+
 **Saving testers.** In `PUT /api/cms/features`, `launch.testers` is a list of **strings**. Each one is an app user id (24 hex characters, sent back unchanged for testers who were already resolved), an email address, or a phone number. The backend resolves each string to a user, and responds with `400 "No app user with the email or phone …"` if it can't find one. `label` is the user's email, then phone, then name.
 
 **Defaults** (`DEFAULT_LAUNCH`): state `live`, resumeTo `live`, rollout `{ percent: 10, audience: EVERYONE, othersSee: "coming_soon", betaLabel: false }`, soon `{ headline: "soon", customHeadline: null, message: null, notifyMe: true, goLiveAt: null }`, paused `{ title: null, message: null, alternative: none, alternativeLabel: null, resumeAt: null }`, testers `[]`, since `null`.
@@ -352,7 +354,8 @@ type Launch = {
 
 | Endpoint | Permission | Returns |
 |---|---|---|
-| `GET /api/cms/launches` | cms.read | `{ stats: { [itemKey]: { waiting: number; lockedTaps: number } } }` (only item keys that have data) |
+| `GET /api/cms/launches` | cms.read | `{ stats: { [itemKey]: { waiting, toNotify, deviceOnly, lastNotifiedAt, lockedTaps } } }` (only item keys that have data). `toNotify` = sign-ups with an account that haven't had the "It's here" push yet; `deviceOnly` = signed-out sign-ups, which a push can't reach |
+| `POST /api/cms/launches/:itemKey/announce` | cms.manage | Body `{ title, body }`. Only for a live item. Pushes "It's here" to its `toNotify` people, up to 5000 per send, through the Admin Workspace broadcast worker (push + in-app inbox, opening the feature). Returns `202 { broadcastId, recipients, withPush, remaining }` |
 | `GET /api/cms/launches/:itemKey/waitlist` | cms.manage | `{ entries: [{ createdAt, platform: "android"\|"ios"\|"web"\|null, user: { _id, firstName?, lastName?, email?, phone? } \| null }] }`, newest first, max 5000. The CMS turns this into a CSV file |
 
 The Launches page's quick actions (Launch, Pause, Resume, change %) are ordinary `PUT /api/cms/features` saves of the whole list, with that one item changed.
@@ -437,7 +440,7 @@ We don't show crash rates or engagement per rollout slice. That belongs in the a
 |---|---|
 | **v1: Launch states** | Four states on features and link tiles, testers, Coming soon / Paused sheets, route guard, Launch fieldset + recipes, "Preview as", row pills, Overview card, old-build safety |
 | **v1.1: Demand & schedule** | Notify me (device + account), signup counts + CSV, locked-tap counts, Go live on / Resume on schedules, Launches page |
-| **v2: Close the loop** | Push "It's here!" to the Notify me list at launch (needs push infra), launch states on Home sections, banner editor warnings, a "Launch" banner template |
+| **v2: Close the loop** | ✅ Push "It's here" to the Notify me list at launch (Launches page → *Tell N it's here*); ✅ banner editor warnings. Still to do: launch states on Home sections, a "Launch" banner template |
 
 Launches page could move to v1 if we expect to run a rollout immediately. It's mostly a filtered view of data v1 already has.
 

@@ -16,6 +16,7 @@ import {
 } from "../lib/api";
 import { BANNER_PLACEMENT_LABEL, isColor, relativeTime, resolvePalette, toHex6 } from "../lib/catalog";
 import { useCms } from "../lib/store";
+import { LAUNCH_STATE_LABEL, featureForRoute, isFullyLive } from "../lib/launch";
 import { BannerPreview, HomeScreen, HubScreen, PhoneFrame, ProfileScreen } from "../components/AppPreview";
 import { ActionEditor, AudienceEditor, actionError, audienceError, describeAction, describeAudience } from "../components/editors";
 import { PageHeader, Segmented, Switch, useToast } from "../components/ui";
@@ -227,6 +228,18 @@ const BannerEditor: React.FC<{ initial: Banner | null; onClose: () => void }> = 
             </div>
 
             <ActionEditor value={draft.action} allowed={config!.catalog.bannerActions} onChange={(action) => set({ action })} />
+            {(() => {
+              // A banner that opens a screen not everyone can use yet wastes the slot (the app shows its sheet instead).
+              const target = draft.action.type === "route" ? featureForRoute(config!.features, draft.action.value) : undefined;
+              if (!target || isFullyLive(target.launch)) return null;
+              return (
+                <small className="warn">
+                  {target.title} is {LAUNCH_STATE_LABEL[target.launch.state].toLowerCase()}
+                  {target.launch.state === "rolling_out" ? ` (${target.launch.rollout.percent}%)` : ""}. People without it see its
+                  {target.launch.state === "paused" ? " “short break”" : " Coming soon"} sheet instead of the screen.
+                </small>
+              );
+            })()}
             <label className="field">
               <span>{draft.placement === "popup" ? "Main button label" : "Button label"}</span>
               <input value={draft.ctaLabel ?? ""} maxLength={24} placeholder={draft.placement === "popup" ? "e.g. Open (default)" : "e.g. Upgrade"} onChange={(e) => set({ ctaLabel: e.target.value })} disabled={draft.action.type === "none"} />

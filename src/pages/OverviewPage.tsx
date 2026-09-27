@@ -1,13 +1,14 @@
 import React, { useMemo } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, LayoutGrid, Megaphone, Palette, Rows3 } from "lucide-react";
+import { ArrowRight, LayoutGrid, Megaphone, Palette, Rocket, Rows3 } from "lucide-react";
 import { resolvePalette, relativeTime, staffName } from "../lib/catalog";
 import { useCms } from "../lib/store";
+import { launchItems } from "../lib/launch";
 import { HomeScreen, PhoneFrame } from "../components/AppPreview";
 import { PageHeader } from "../components/ui";
 
 export const OverviewPage: React.FC = () => {
-  const { config, banners, canManage } = useCms();
+  const { config, banners, canManage, launchStats } = useCms();
   const palette = useMemo(() => resolvePalette("light", config!.theme), [config]);
   const c = config!;
 
@@ -20,6 +21,11 @@ export const OverviewPage: React.FC = () => {
   const links = c.customTiles.filter((t) => t.enabled).length;
   const moved = c.features.filter((f) => f.placement !== f.defaults.placement).length;
   const themed = Object.keys(c.theme.light).length + Object.keys(c.theme.dark).length;
+  const launches = launchItems(c.features, c.customTiles);
+  const soon = launches.filter((i) => i.launch.state === "coming_soon").length;
+  const rolling = launches.filter((i) => i.launch.state === "rolling_out").length;
+  const paused = launches.filter((i) => i.launch.state === "paused");
+  const waiting = Object.values(launchStats).reduce((sum, s) => sum + s.waiting, 0);
 
   const cards = [
     {
@@ -28,6 +34,13 @@ export const OverviewPage: React.FC = () => {
       title: "Features",
       value: `${shown} of ${c.features.length} shown`,
       note: [c.features.length - shown > 0 ? `${c.features.length - shown} hidden` : "none hidden", `${moved} moved`, `${links} link tile${links === 1 ? "" : "s"}`].join(" · ")
+    },
+    {
+      to: "/launches",
+      icon: Rocket,
+      title: "Launches",
+      value: soon + rolling + paused.length ? `${soon + rolling + paused.length} in flight` : "Everything live",
+      note: [`${soon} coming soon`, `${rolling} rolling out`, `${paused.length} paused`, waiting ? `${waiting.toLocaleString()} waiting` : null].filter(Boolean).join(" · ")
     },
     {
       to: "/home-layout",
@@ -75,6 +88,13 @@ export const OverviewPage: React.FC = () => {
               </Link>
             ))}
           </div>
+
+          {paused.length > 0 && (
+            <div className="notice notice-error" style={{ margin: "0 0 16px" }}>
+              <strong>{paused.length === 1 ? `${paused[0].title} is paused` : `${paused.length} features are paused`}</strong> — people see a “short break” sheet
+              instead. <Link to="/launches">Resume in Launches</Link>.
+            </div>
+          )}
 
           {c.settings.maintenance.enabled && (
             <div className="notice notice-error" style={{ margin: "0 0 16px" }}>

@@ -33,6 +33,73 @@ export const EVERYONE: Audience = { segment: "all", platforms: [], minAppVersion
 export type ActionType = "none" | "route" | "url" | "app";
 export type TapAction = { type: ActionType; value: string | null; fallbackUrl: string | null };
 
+/* ------------------------------ Launch states ----------------------------- */
+// See docs/launch-states.md §7.1. Every feature and link tile has one.
+
+export type LaunchState = "live" | "coming_soon" | "rolling_out" | "paused";
+export type LaunchHeadline = "soon" | "this_month" | "next_month" | "custom";
+/** A tester as typed in the CMS: `id` is null until the server resolves the email/phone on save. */
+export type Tester = { id: string | null; label: string };
+
+export type Launch = {
+  state: LaunchState;
+  /** While paused: what Resume goes back to. */
+  resumeTo: "live" | "rolling_out";
+  rollout: { percent: number; audience: Audience; othersSee: "coming_soon" | "hidden"; betaLabel: boolean };
+  soon: { headline: LaunchHeadline; customHeadline: string | null; message: string | null; notifyMe: boolean; goLiveAt: string | null };
+  paused: { title: string | null; message: string | null; alternative: TapAction; alternativeLabel: string | null; resumeAt: string | null };
+  testers: Tester[];
+  /** Server-set: when `state` last changed. */
+  since: string | null;
+};
+
+export const DEFAULT_LAUNCH: Launch = {
+  state: "live",
+  resumeTo: "live",
+  rollout: { percent: 10, audience: EVERYONE, othersSee: "coming_soon", betaLabel: false },
+  soon: { headline: "soon", customHeadline: null, message: null, notifyMe: true, goLiveAt: null },
+  paused: { title: null, message: null, alternative: { type: "none", value: null, fallbackUrl: null }, alternativeLabel: null, resumeAt: null },
+  testers: [],
+  since: null
+};
+
+/** Fill anything missing (e.g. a backend without launch states yet) from the defaults. */
+export const normalizeLaunch = (raw?: Partial<Launch> | null): Launch => {
+  const l = raw ?? {};
+  return {
+    ...DEFAULT_LAUNCH,
+    ...l,
+    rollout: { ...DEFAULT_LAUNCH.rollout, ...(l.rollout ?? {}), audience: { ...EVERYONE, ...(l.rollout?.audience ?? {}) } },
+    soon: { ...DEFAULT_LAUNCH.soon, ...(l.soon ?? {}) },
+    paused: { ...DEFAULT_LAUNCH.paused, ...(l.paused ?? {}), alternative: { ...DEFAULT_LAUNCH.paused.alternative, ...(l.paused?.alternative ?? {}) } },
+    testers: (l.testers ?? []).map((t) => ({ id: t.id ?? null, label: t.label ?? t.id ?? "" })),
+    since: l.since ?? null
+  };
+};
+
+/** What PUT /api/cms/features takes: testers as strings (resolved id, or the typed email/phone), no `since`. */
+const launchPayload = ({ since: _s, testers, soon, paused, ...l }: Launch) => ({
+  ...l,
+  soon: { ...soon, customHeadline: soon.customHeadline?.trim() || null, message: soon.message?.trim() || null },
+  paused: {
+    ...paused,
+    title: paused.title?.trim() || null,
+    message: paused.message?.trim() || null,
+    alternative: paused.alternative.type === "none" ? { type: "none", value: null, fallbackUrl: null } : paused.alternative,
+    alternativeLabel: paused.alternative.type === "none" ? null : paused.alternativeLabel?.trim() || null
+  },
+  testers: testers.map((t) => t.id ?? t.label.trim())
+});
+
+/** Stats key: the feature key, or `link:<id>` for a link tile. */
+export type LaunchStats = Record<string, { waiting: number; lockedTaps: number }>;
+
+export type WaitlistEntry = {
+  createdAt: string;
+  platform: AudiencePlatform | null;
+  user: { _id: string; firstName?: string; lastName?: string; email?: string; phone?: string } | null;
+};
+
 /** An admin-made link tile living next to the built-in features. */
 export type CustomTile = {
   id?: string;
@@ -47,6 +114,7 @@ export type CustomTile = {
   badge: string | null;
   action: TapAction;
   audience: Audience;
+  launch: Launch;
 };
 
 export type ConfigSection = "features" | "homeSections" | "theme" | "settings";
@@ -87,6 +155,7 @@ export type Feature = {
   description: string;
   badge: string | null;
   audience: Audience;
+  launch: Launch;
   defaults: { title: string; description: string; placement: FeaturePlacement; size: FeatureSize; colorKey: string };
 };
 
@@ -260,13 +329,20 @@ export const getMe = () => get<{ user: StaffUser; access: StaffUser["access"] }>
 
 type SavedConfig = Omit<CmsConfig, "catalog">;
 
-export const getConfig = () => get<CmsConfig>("/api/cms/config");
+/** Give every feature and link tile a complete `launch`, whatever the server sent. */
+export const withLaunches = <T extends Partial<SavedConfig>>(c: T): T => ({
+  ...c,
+  ...(c.features && { features: c.features.map((f) => ({ ...f, launch: normalizeLaunch(f.launch) })) }),
+  ...(c.customTiles && { customTiles: c.customTiles.map((t) => ({ ...t, launch: normalizeLaunch(t.launch) })) })
+});
+
+export const getConfig = async () => withLaunches(await get<CmsConfig>("/api/cms/config"));
 
 export const saveFeatures = (version: number, features: Feature[], customTiles: CustomTile[]) =>
   send<SavedConfig>("PUT", "/api/cms/features", {
     version,
-    customTiles,
-    features: features.map(({ key, enabled, placement, size, colorKey, order, title, description, badge, audience, defaults }) => ({
+    customTiles: customTiles.map((t) => ({ ...t, launch: launchPayload(t.launch) })),
+    features: features.map(({ key, enabled, placement, size, colorKey, order, title, description, badge, audience, launch, defaults }) => ({
       key,
       enabled,
       placement,
@@ -278,9 +354,14 @@ export const saveFeatures = (version: number, features: Feature[], customTiles: 
       title: title.trim() === defaults.title ? null : title.trim() || null,
       description: description.trim() === defaults.description ? null : description.trim() || null,
       badge: badge?.trim() || null,
-      audience
+      audience,
+      launch: launchPayload(launch)
     }))
   });
+
+export const getLaunchStats = () => get<{ stats: LaunchStats }>("/api/cms/launches");
+export const getWaitlist = (itemKey: string) =>
+  get<{ entries: WaitlistEntry[] }>(`/api/cms/launches/${encodeURIComponent(itemKey)}/waitlist`);
 
 export const saveSettings = (version: number, settings: AppSettings) =>
   send<SavedConfig>("PUT", "/api/cms/settings", { version, settings });

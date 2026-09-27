@@ -5,15 +5,18 @@ import {
   CMS_MANAGE,
   CMS_READ,
   CmsConfig,
+  LaunchStats,
   StaffUser,
   errorMessage,
   getConfig,
+  getLaunchStats,
   getMe,
   getToken,
   listBanners,
   login as apiLogin,
   onUnauthorized,
-  setToken
+  setToken,
+  withLaunches
 } from "./api";
 
 /* ---------------------------------- Auth --------------------------------- */
@@ -75,6 +78,8 @@ export const canManage = (perms: string[]) => perms.includes(CMS_MANAGE);
 type CmsState = {
   config: CmsConfig | null;
   banners: Banner[];
+  /** Notify me signups and locked taps per item key; empty until loaded (or on an older backend). */
+  launchStats: LaunchStats;
   loading: boolean;
   error: string | null;
   canManage: boolean;
@@ -90,6 +95,7 @@ export const CmsProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const { permissions } = useAuth();
   const [config, setConfig] = useState<CmsConfig | null>(null);
   const [banners, setBanners] = useState<Banner[]>([]);
+  const [launchStats, setLaunchStats] = useState<LaunchStats>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -99,6 +105,10 @@ export const CmsProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const [c, b] = await Promise.all([getConfig(), listBanners()]);
       setConfig(c);
       setBanners(b.banners);
+      // Stats are extra: a failure here must not block the editors.
+      getLaunchStats()
+        .then((r) => setLaunchStats(r.stats ?? {}))
+        .catch(() => undefined);
     } catch (err) {
       setError(errorMessage(err, "Couldn't load the app config."));
     } finally {
@@ -111,12 +121,12 @@ export const CmsProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [reload]);
 
   const applySaved = useCallback((saved: Partial<CmsConfig>) => {
-    setConfig((c) => (c ? { ...c, ...saved } : c));
+    setConfig((c) => (c ? { ...c, ...withLaunches(saved) } : c));
   }, []);
 
   const value = useMemo(
-    () => ({ config, banners, loading, error, canManage: canManage(permissions), reload, applySaved, setBanners }),
-    [config, banners, loading, error, permissions, reload, applySaved]
+    () => ({ config, banners, launchStats, loading, error, canManage: canManage(permissions), reload, applySaved, setBanners }),
+    [config, banners, launchStats, loading, error, permissions, reload, applySaved]
   );
   return <CmsContext.Provider value={value}>{children}</CmsContext.Provider>;
 };

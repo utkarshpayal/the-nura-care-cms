@@ -1,4 +1,3 @@
-import React from "react";
 import {
   Activity,
   AlertCircle,
@@ -28,12 +27,14 @@ import {
   Instagram,
   Leaf,
   Link as LinkIcon,
+  Lock,
   Mail,
   Megaphone,
   MessageCircle,
   MessagesSquare,
   Orbit,
   Phone,
+  Pause,
   PlayCircle,
   ShoppingCart,
   Smile,
@@ -41,6 +42,7 @@ import {
   Star,
   Store,
   Tag,
+  Bell,
   TrendingUp,
   Trophy,
   Twitter,
@@ -50,7 +52,8 @@ import {
   Youtube,
   type LucideIcon
 } from "lucide-react";
-import type { Banner, CustomTile, Feature, FeaturePlacement, FeatureSize, HomeSection, ThemeMode } from "../lib/api";
+import React, { createContext, useContext, useState } from "react";
+import type { Banner, CustomTile, Feature, FeaturePlacement, FeatureSize, HomeSection, Launch, ThemeMode } from "../lib/api";
 import { PLACEMENT_LABEL } from "../lib/catalog";
 
 /*
@@ -111,6 +114,11 @@ type Palette = Record<string, string>;
 
 const tint = (p: Palette, key: string) => ({ fg: p[key] ?? p.primary, bg: p[`${key}Light`] ?? p.primaryLight });
 
+/** Whose view the preview shows: someone who has the feature (tester / in the rollout), or everyone else. */
+export type ViewAs = "access" | "others";
+
+type TileSheet = { kind: "soon" | "paused"; headline: string; message: string | null; notifyMe: boolean; alternative: string | null };
+
 /** What a preview tile needs, from either a built-in feature or a link tile. */
 export type PreviewTile = {
   key: string;
@@ -123,28 +131,147 @@ export type PreviewTile = {
   order: number;
   external: boolean;
   hiddenFor?: string;
+  /** Locked (Coming soon) or paused for this view; a tap opens `sheet`. */
+  lock?: "soon" | "paused";
+  beta?: boolean;
+  sheet?: TileSheet;
 };
 
-/** Enabled features + link tiles for a placement, in the shared order. */
-export const tilesIn = (features: Feature[], links: CustomTile[], placement: FeaturePlacement): PreviewTile[] =>
-  [
-    ...features
-      .filter((f) => f.enabled && f.placement === placement)
-      .map((f) => ({ key: f.key, title: f.title, description: f.description, icon: f.icon, colorKey: f.colorKey, size: f.size, badge: f.badge, order: f.order, external: false })),
-    ...links
-      .filter((t) => t.enabled && t.placement === placement)
-      .map((t, i) => ({
-        key: `link:${t.id ?? i}`,
-        title: t.title || "Untitled link",
-        description: t.description ?? "",
-        icon: t.icon,
-        colorKey: t.colorKey,
-        size: t.size,
-        badge: t.badge,
-        order: t.order,
-        external: t.action.type === "url" || t.action.type === "app"
-      }))
-  ].sort((a, b) => a.order - b.order);
+const HEADLINES = { soon: "Coming soon", this_month: "Coming this month", next_month: "Coming next month" } as const;
+
+/**
+ * How an item shows for `viewAs` (mirrors the app, docs/launch-states.md
+ * §7.3): null = not shown. People with access see it open (BETA while
+ * rolling out); everyone else sees its launch state.
+ */
+const launchLook = (l: Launch, description: string, viewAs: ViewAs): Pick<PreviewTile, "lock" | "beta" | "sheet"> | null => {
+  if (viewAs === "access" || l.state === "live") return { beta: l.state === "rolling_out" && l.rollout.betaLabel };
+  if (l.state === "rolling_out" && l.rollout.othersSee === "hidden") return null;
+  if (l.state === "paused") {
+    return {
+      lock: "paused",
+      sheet: {
+        kind: "paused",
+        headline: l.paused.title || "Taking a short break",
+        message: l.paused.message || "We're working on it. Please check back soon.",
+        notifyMe: false,
+        alternative:
+          l.paused.alternative.type === "none"
+            ? null
+            : l.paused.alternativeLabel?.trim() || (l.paused.alternative.type === "route" ? "Go there instead" : "Get help another way")
+      }
+    };
+  }
+  return {
+    lock: "soon",
+    sheet: {
+      kind: "soon",
+      headline: l.soon.headline === "custom" ? l.soon.customHeadline || "Coming soon" : HEADLINES[l.soon.headline],
+      message: l.soon.message || description || null,
+      notifyMe: l.soon.notifyMe,
+      alternative: null
+    }
+  };
+};
+
+/** Enabled features + link tiles for a placement, in the shared order, as `viewAs` sees them. */
+export const tilesIn = (features: Feature[], links: CustomTile[], placement: FeaturePlacement, viewAs: ViewAs = "others"): PreviewTile[] => {
+  const tiles: PreviewTile[] = [];
+  for (const f of features) {
+    if (!f.enabled || f.placement !== placement) continue;
+    const look = f.launch ? launchLook(f.launch, f.description, viewAs) : {};
+    if (!look) continue;
+    tiles.push({ key: f.key, title: f.title, description: f.description, icon: f.icon, colorKey: f.colorKey, size: f.size, badge: f.badge, order: f.order, external: false, ...look });
+  }
+  links.forEach((t, i) => {
+    if (!t.enabled || t.placement !== placement) return;
+    const look = t.launch ? launchLook(t.launch, t.description ?? "", viewAs) : {};
+    if (!look) return;
+    tiles.push({
+      key: `link:${t.id ?? i}`,
+      title: t.title || "Untitled link",
+      description: t.description ?? "",
+      icon: t.icon,
+      colorKey: t.colorKey,
+      size: t.size,
+      badge: t.badge,
+      order: t.order,
+      external: t.action.type === "url" || t.action.type === "app",
+      ...look
+    });
+  });
+  return tiles.sort((a, b) => a.order - b.order);
+};
+
+/** Tapping a locked tile in the preview opens its sheet (see LaunchSheetHost). */
+const SheetContext = createContext<(tile: PreviewTile) => void>(() => undefined);
+
+/** The Coming soon / Paused bottom sheet, drawn inside the phone. */
+const LaunchSheet: React.FC<{ tile: PreviewTile; palette: Palette; onClose: () => void }> = ({ tile, palette, onClose }) => {
+  const Icon = ICONS[tile.icon] ?? Sparkles;
+  const { fg, bg } = tint(palette, tile.colorKey);
+  const s = tile.sheet!;
+  return (
+    <div className="pv-sheet-overlay" onClick={onClose}>
+      <div className="pv-sheet" style={{ background: palette.surface, color: palette.foreground }} onClick={(e) => e.stopPropagation()}>
+        <span className="pv-sheet-grip" style={{ background: palette.border }} />
+        <span className="pv-sheet-icon" style={{ background: bg, color: fg }}>
+          <Icon size={18} />
+        </span>
+        {s.kind === "soon" ? (
+          <>
+            <strong>{tile.title}</strong>
+            <em style={{ color: palette.primary }}>{s.headline}</em>
+          </>
+        ) : (
+          <strong>{s.headline}</strong>
+        )}
+        {s.message && <p style={{ color: palette.mutedText }}>{s.message}</p>}
+        {s.notifyMe && (
+          <span className="pv-sheet-btn" style={{ background: palette.button, color: palette.buttonText }}>
+            <Bell size={10} /> Notify me
+          </span>
+        )}
+        {s.alternative && (
+          <span className="pv-sheet-btn" style={{ background: palette.button, color: palette.buttonText }}>
+            {s.alternative}
+          </span>
+        )}
+        <span className="pv-sheet-close" style={{ color: palette.mutedText }} onClick={onClose}>
+          {s.kind === "soon" ? "Maybe later" : "OK"}
+        </span>
+      </div>
+    </div>
+  );
+};
+
+/** Lets locked tiles inside `children` open their sheet over the phone screen (used by PhoneFrame). */
+const LaunchSheetHost: React.FC<{ palette: Palette; children: React.ReactNode }> = ({ palette, children }) => {
+  const [open, setOpen] = useState<PreviewTile | null>(null);
+  return (
+    <SheetContext.Provider value={setOpen}>
+      {children}
+      {open && <LaunchSheet tile={open} palette={palette} onClose={() => setOpen(null)} />}
+    </SheetContext.Provider>
+  );
+};
+
+/** SOON / BETA pill, or the pause dot, on a tile. */
+const LaunchMark: React.FC<{ tile: PreviewTile; palette: Palette }> = ({ tile, palette }) => {
+  if (tile.lock === "soon")
+    return (
+      <em className="pv-badge pv-soon-pill" style={{ background: palette.mutedText, color: palette.surface }}>
+        <Lock size={6} /> SOON
+      </em>
+    );
+  if (tile.beta)
+    return (
+      <em className="pv-badge" style={{ background: palette.secondary, color: palette.buttonText }}>
+        BETA
+      </em>
+    );
+  return null;
+};
 
 export const PhoneFrame: React.FC<{ palette: Palette; children: React.ReactNode; label?: string }> = ({ palette, children, label }) => (
   <div className="phone" aria-label={label ?? "App preview"}>
@@ -154,7 +281,7 @@ export const PhoneFrame: React.FC<{ palette: Palette; children: React.ReactNode;
         <span>9:41</span>
         <span className="phone-status-icons">●●● ▮</span>
       </div>
-      {children}
+      <LaunchSheetHost palette={palette}>{children}</LaunchSheetHost>
     </div>
   </div>
 );
@@ -241,18 +368,32 @@ const BannerRow: React.FC<{ banners: Partial<Banner>[]; palette: Palette }> = ({
 /* ---------------------------------- Tiles --------------------------------- */
 
 const Tile: React.FC<{ tile: PreviewTile; palette: Palette }> = ({ tile, palette }) => {
+  const openSheet = useContext(SheetContext);
   const Icon = ICONS[tile.icon] ?? Sparkles;
   const { fg, bg } = tint(palette, tile.colorKey);
   const large = tile.size === "large";
+  // A locked or paused tile shows SOON / the pause dot instead of its own badge, and taps open the sheet.
+  const marked = Boolean(tile.lock || tile.beta);
   return (
-    <div className={`pv-tile ${large ? "is-large" : ""}`} style={{ background: large ? bg : palette.surface, borderColor: palette.border }}>
+    <div
+      className={`pv-tile ${large ? "is-large" : ""} ${tile.lock === "soon" ? "is-locked" : ""} ${tile.sheet ? "is-tappable" : ""}`}
+      style={{ background: large ? bg : palette.surface, borderColor: palette.border }}
+      onClick={tile.sheet ? () => openSheet(tile) : undefined}
+      title={tile.sheet ? "Tap to see what people see" : undefined}
+    >
+      {tile.lock === "paused" && (
+        <span className="pv-pause-dot" style={{ background: palette.warning, borderColor: palette.surface }}>
+          <Pause size={5} />
+        </span>
+      )}
       <span className="pv-tile-icon" style={{ background: large ? palette.surface : bg, color: fg }}>
         <Icon size={13} />
       </span>
       <span className="pv-tile-text">
         <strong style={{ color: palette.foreground }}>
           {tile.title}
-          {tile.badge && (
+          <LaunchMark tile={tile} palette={palette} />
+          {!marked && tile.badge && (
             <em className="pv-badge" style={{ background: palette.primary, color: palette.buttonText }}>
               {tile.badge}
             </em>
@@ -261,11 +402,13 @@ const Tile: React.FC<{ tile: PreviewTile; palette: Palette }> = ({ tile, palette
         <span style={{ color: palette.mutedText }}>{tile.description}</span>
       </span>
       {large ? (
-        <span className="pv-tile-go" style={{ background: palette.primary, color: palette.buttonText }}>
-          {tile.external ? <ExternalLink size={9} /> : <ArrowRight size={10} />}
-        </span>
+        tile.lock !== "soon" && (
+          <span className="pv-tile-go" style={{ background: palette.primary, color: palette.buttonText }}>
+            {tile.external ? <ExternalLink size={9} /> : <ArrowRight size={10} />}
+          </span>
+        )
       ) : (
-        tile.external && <ExternalLink size={9} className="pv-tile-ext" color={palette.mutedText} />
+        tile.external && !tile.lock && <ExternalLink size={9} className="pv-tile-ext" color={palette.mutedText} />
       )}
     </div>
   );
@@ -300,20 +443,34 @@ export const liveBannersIn = (banners: Partial<Banner>[], placement: string) =>
   banners.filter((b) => b.placement === placement && b.status === "live").sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
 
 /** Home / Profile shortcuts: rows of four round icons with labels, no box or heading (same as the app). */
-const Shortcuts: React.FC<{ tiles: PreviewTile[]; palette: Palette }> = ({ tiles, palette }) =>
-  tiles.length === 0 ? null : (
+const Shortcuts: React.FC<{ tiles: PreviewTile[]; palette: Palette }> = ({ tiles, palette }) => {
+  const openSheet = useContext(SheetContext);
+  return tiles.length === 0 ? null : (
     <div className="pv-shortcuts">
       {tiles.map((tile) => {
         const Icon = ICONS[tile.icon] ?? Sparkles;
         const { fg, bg } = tint(palette, tile.colorKey);
+        const mark = tile.lock === "soon" ? "SOON" : tile.beta ? "BETA" : tile.lock === "paused" ? null : tile.badge;
         return (
-          <div key={tile.key} className="pv-shortcut">
+          <div
+            key={tile.key}
+            className={`pv-shortcut ${tile.lock === "soon" ? "is-locked" : ""} ${tile.sheet ? "is-tappable" : ""}`}
+            onClick={tile.sheet ? () => openSheet(tile) : undefined}
+          >
             <span className="pv-shortcut-icon" style={{ background: bg, color: fg }}>
               <Icon size={14} />
-              {tile.badge && (
-                <em className="pv-shortcut-badge" style={{ background: palette.primary, color: palette.buttonText, borderColor: palette.background }}>
-                  {tile.badge}
+              {mark && (
+                <em
+                  className="pv-shortcut-badge"
+                  style={{ background: tile.lock === "soon" ? palette.mutedText : tile.beta ? palette.secondary : palette.primary, color: palette.buttonText, borderColor: palette.background }}
+                >
+                  {mark}
                 </em>
+              )}
+              {tile.lock === "paused" && (
+                <span className="pv-pause-dot" style={{ background: palette.warning, borderColor: palette.background }}>
+                  <Pause size={5} />
+                </span>
               )}
             </span>
             <span style={{ color: palette.foreground }}>{tile.title}</span>
@@ -322,6 +479,7 @@ const Shortcuts: React.FC<{ tiles: PreviewTile[]; palette: Palette }> = ({ tiles
       })}
     </div>
   );
+};
 
 /* --------------------------------- Screens -------------------------------- */
 
@@ -330,10 +488,12 @@ type ScreenProps = {
   links: CustomTile[];
   banners: Partial<Banner>[];
   palette: Palette;
+  /** Whose view to draw; defaults to everyone else (what most people see). */
+  viewAs?: ViewAs;
 };
 
-export const HubScreen: React.FC<ScreenProps & { placement: FeaturePlacement }> = ({ placement, features, links, banners, palette }) => {
-  const tiles = tilesIn(features, links, placement);
+export const HubScreen: React.FC<ScreenProps & { placement: FeaturePlacement }> = ({ placement, features, links, banners, palette, viewAs }) => {
+  const tiles = tilesIn(features, links, placement, viewAs);
   return (
     <div className="pv-body">
       <div className="pv-header" style={{ color: palette.foreground }}>
@@ -354,7 +514,7 @@ export const HubScreen: React.FC<ScreenProps & { placement: FeaturePlacement }> 
   );
 };
 
-export const ProfileScreen: React.FC<ScreenProps> = ({ features, links, banners, palette }) => (
+export const ProfileScreen: React.FC<ScreenProps> = ({ features, links, banners, palette, viewAs }) => (
   <div className="pv-body">
     <div className="pv-profile-head" style={{ color: palette.foreground }}>
       <span className="pv-avatar" style={{ background: palette.primaryLight, color: palette.primary }}>
@@ -371,7 +531,7 @@ export const ProfileScreen: React.FC<ScreenProps> = ({ features, links, banners,
       ))}
     </div>
     <BannerRow banners={liveBannersIn(banners, "profile")} palette={palette} />
-    <Shortcuts tiles={tilesIn(features, links, "profile")} palette={palette} />
+    <Shortcuts tiles={tilesIn(features, links, "profile", viewAs)} palette={palette} />
     <span className="pv-logout" style={{ color: palette.primary }}>
       Log out
     </span>
@@ -385,7 +545,8 @@ export const HomeScreen: React.FC<ScreenProps & { sections: HomeSection[]; mode:
   banners,
   palette,
   mode,
-  showPopup
+  showPopup,
+  viewAs
 }) => {
   const hero =
     mode === "dark"
@@ -456,7 +617,7 @@ export const HomeScreen: React.FC<ScreenProps & { sections: HomeSection[]; mode:
           </div>
         );
       case "shortcuts":
-        return <Shortcuts tiles={tilesIn(features, links, "home")} palette={palette} />;
+        return <Shortcuts tiles={tilesIn(features, links, "home", viewAs)} palette={palette} />;
       case "promo_top":
         return <BannerRow banners={liveBannersIn(banners, "home_top")} palette={palette} />;
       case "promo_middle":
@@ -474,7 +635,7 @@ export const HomeScreen: React.FC<ScreenProps & { sections: HomeSection[]; mode:
           </div>
         );
       case "moreForYou": {
-        const hubs = (["care_hub", "wellness_hub", "explore_hub"] as FeaturePlacement[]).filter((p) => tilesIn(features, links, p).length > 0);
+        const hubs = (["care_hub", "wellness_hub", "explore_hub"] as FeaturePlacement[]).filter((p) => tilesIn(features, links, p, viewAs).length > 0);
         if (hubs.length === 0) return null;
         return (
           <div className="pv-more">
@@ -484,7 +645,7 @@ export const HomeScreen: React.FC<ScreenProps & { sections: HomeSection[]; mode:
             {hubs.map((p) => (
               <div key={p} className="pv-hub-row" style={{ background: palette.surface, borderColor: palette.border }}>
                 <strong style={{ color: palette.foreground }}>{PLACEMENT_LABEL[p]}</strong>
-                <span style={{ color: palette.mutedText }}>{tilesIn(features, links, p).length} tiles</span>
+                <span style={{ color: palette.mutedText }}>{tilesIn(features, links, p, viewAs).length} tiles</span>
                 <ArrowRight size={11} color={palette.primary} />
               </div>
             ))}

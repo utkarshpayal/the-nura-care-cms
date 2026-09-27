@@ -9,6 +9,7 @@ import {
   Megaphone,
   Orbit,
   Palette,
+  Rocket,
   Rows3,
   RotateCcw,
   Save,
@@ -58,6 +59,7 @@ export const useToast = () => useContext(ToastContext);
 const NAV = [
   { to: "/", label: "Overview", icon: LayoutDashboard, end: true },
   { to: "/features", label: "Screens & features", icon: LayoutGrid },
+  { to: "/launches", label: "Launches", icon: Rocket },
   { to: "/home-layout", label: "Home layout", icon: Rows3 },
   { to: "/banners", label: "Banners & ads", icon: Megaphone },
   { to: "/era-tips", label: "Your Era tips", icon: Orbit },

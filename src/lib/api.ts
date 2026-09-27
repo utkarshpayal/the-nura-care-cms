@@ -333,7 +333,13 @@ export type TipsResponse = {
   categories: TipCategory[];
   categoryLabels: Record<TipCategory, string>;
   eras: Record<CyclePhase, PhaseEra>;
+  /** The built-in era cards, for "Reset to default". */
+  eraDefaults: Record<CyclePhase, PhaseEra>;
+  /** Phases whose era card has been edited in the CMS. */
+  customisedEras: CyclePhase[];
 };
+
+export type EraInput = { name: string; emoji: string; tagline: string; aura: [string, string] };
 
 export const listTips = () => get<TipsResponse>("/api/cms/cycle-sync-tips");
 export const seedTips = () => send<{ tips: CycleSyncTip[] }>("POST", "/api/cms/cycle-sync-tips/seed");
@@ -341,6 +347,10 @@ export const createTip = (input: TipInput) => send<{ tip: CycleSyncTip }>("POST"
 export const updateTip = (id: string, input: TipInput) =>
   send<{ tip: CycleSyncTip }>("PUT", `/api/cms/cycle-sync-tips/${id}`, input);
 export const deleteTip = (id: string) => send<{ id: string }>("DELETE", `/api/cms/cycle-sync-tips/${id}`);
+export const updateEra = (phase: CyclePhase, input: EraInput) =>
+  send<{ eras: Record<CyclePhase, PhaseEra> }>("PUT", `/api/cms/cycle-sync-eras/${phase}`, input);
+export const resetEra = (phase: CyclePhase) =>
+  send<{ eras: Record<CyclePhase, PhaseEra> }>("DELETE", `/api/cms/cycle-sync-eras/${phase}`);
 
 export async function uploadImage(file: File): Promise<string> {
   const form = new FormData();

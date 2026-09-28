@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from "react";
-import { Eye, ImagePlus, Loader2, MousePointerClick, Pencil, Plus, Trash2, X } from "lucide-react";
+import { ChevronDown, Eye, ImagePlus, LayoutTemplate, Loader2, MousePointerClick, Pencil, Plus, Trash2, X } from "lucide-react";
 import {
   EVERYONE,
   Banner,
@@ -16,6 +16,16 @@ import {
 } from "../lib/api";
 import { BANNER_PLACEMENT_LABEL, isColor, relativeTime, resolvePalette, toHex6 } from "../lib/catalog";
 import { useCms } from "../lib/store";
+import {
+  BANNER_TEMPLATES,
+  BannerTemplate,
+  BannerTemplateGroup,
+  PLACEHOLDER,
+  TEMPLATE_GROUP_LABEL,
+  isTemplateImage,
+  templateImageFile,
+  templateImageUrl
+} from "../lib/bannerTemplates";
 import { LAUNCH_STATE_LABEL, featureForRoute, isFullyLive } from "../lib/launch";
 import { BannerPreview, HomeScreen, HubScreen, PhoneFrame, ProfileScreen } from "../components/AppPreview";
 import { ActionEditor, AudienceEditor, actionError, audienceError, describeAction, describeAudience } from "../components/editors";
@@ -80,7 +90,8 @@ const ColorInput: React.FC<{ label: string; value: string; placeholder: string; 
   </label>
 );
 
-const BannerEditor: React.FC<{ initial: Banner | null; onClose: () => void }> = ({ initial, onClose }) => {
+/** `template` prefills a new banner (see lib/bannerTemplates.ts). */
+const BannerEditor: React.FC<{ initial: Banner | null; template?: BannerInput; onClose: () => void }> = ({ initial, template, onClose }) => {
   const { config, banners, setBanners, canManage } = useCms();
   const toast = useToast();
   const [draft, setDraft] = useState<BannerInput>(() =>
@@ -96,7 +107,9 @@ const BannerEditor: React.FC<{ initial: Banner | null; onClose: () => void }> = 
           action: { ...initial.action, fallbackUrl: initial.action.fallbackUrl ?? null },
           audience: initial.audience ?? EVERYONE
         }
-      : EMPTY
+      : template
+        ? { ...EMPTY, ...template, subtitle: template.subtitle ?? "", ctaLabel: template.ctaLabel ?? "", imageUrl: template.imageUrl ?? "", backgroundColor: template.backgroundColor ?? "", textColor: template.textColor ?? "" }
+        : EMPTY
   );
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -122,6 +135,7 @@ const BannerEditor: React.FC<{ initial: Banner | null; onClose: () => void }> = 
   const blocker = (() => {
     if (!draft.title.trim()) return "Add a title";
     if (draft.layout === "image" && !draft.imageUrl) return "An image banner needs an image";
+    if (PLACEHOLDER.test(draft.action.value ?? "") || PLACEHOLDER.test(draft.action.fallbackUrl ?? "")) return "Replace the YOUR-… placeholder in the link";
     const a = actionError(draft.action) ?? audienceError(draft.audience);
     if (a) return a;
     if (draft.backgroundColor && !isColor(draft.backgroundColor)) return "Background colour isn't valid";
@@ -132,17 +146,20 @@ const BannerEditor: React.FC<{ initial: Banner | null; onClose: () => void }> = 
 
   const handleSave = async () => {
     setSaving(true);
-    const input: BannerInput = {
-      ...draft,
-      title: draft.title.trim(),
-      subtitle: draft.subtitle?.trim() || null,
-      ctaLabel: draft.ctaLabel?.trim() || null,
-      imageUrl: draft.imageUrl || null,
-      backgroundColor: draft.backgroundColor || null,
-      textColor: draft.textColor || null,
-      action: draft.action.type === "none" ? { type: "none", value: null, fallbackUrl: null } : draft.action
-    };
     try {
+      // Template artwork is only uploaded on save, so a cancelled template leaves nothing in S3.
+      let imageUrl = draft.imageUrl || null;
+      if (imageUrl && isTemplateImage(imageUrl)) imageUrl = await uploadImage(await templateImageFile(imageUrl));
+      const input: BannerInput = {
+        ...draft,
+        title: draft.title.trim(),
+        subtitle: draft.subtitle?.trim() || null,
+        ctaLabel: draft.ctaLabel?.trim() || null,
+        imageUrl,
+        backgroundColor: draft.backgroundColor || null,
+        textColor: draft.textColor || null,
+        action: draft.action.type === "none" ? { type: "none", value: null, fallbackUrl: null } : draft.action
+      };
       const { banner } = initial ? await updateBanner(initial._id, input) : await createBanner(input);
       setBanners((all) => (initial ? all.map((b) => (b._id === banner._id ? { ...b, ...banner } : b)) : [banner, ...all]));
       toast("success", banner.status === "live" ? "Banner is live in the app." : `Banner saved (${STATUS_LABEL[banner.status].toLowerCase()}).`);
@@ -167,7 +184,7 @@ const BannerEditor: React.FC<{ initial: Banner | null; onClose: () => void }> = 
     <div className="drawer-overlay" onClick={() => !saving && onClose()}>
       <section className="drawer" role="dialog" aria-modal="true" aria-labelledby="banner-editor-title" onClick={(e) => e.stopPropagation()}>
         <header className="drawer-head">
-          <h2 id="banner-editor-title">{initial ? "Edit banner" : "New banner"}</h2>
+          <h2 id="banner-editor-title">{initial ? "Edit banner" : template ? "New banner from template" : "New banner"}</h2>
           <button type="button" className="icon-btn" onClick={onClose} aria-label="Close" disabled={saving}>
             <X size={18} />
           </button>
@@ -311,10 +328,67 @@ const BannerEditor: React.FC<{ initial: Banner | null; onClose: () => void }> = 
   );
 };
 
+const TemplateGallery: React.FC<{ onPick: (t: BannerTemplate) => void }> = ({ onPick }) => {
+  const { config, canManage } = useCms();
+  const palette = useMemo(() => resolvePalette("light", config!.theme), [config]);
+  const [open, setOpen] = useState(true);
+  const [group, setGroup] = useState<BannerTemplateGroup | "all">("all");
+  const groups = Object.keys(TEMPLATE_GROUP_LABEL) as BannerTemplateGroup[];
+  const shown = BANNER_TEMPLATES.filter((t) => group === "all" || t.group === group);
+
+  return (
+    <section className="card template-gallery">
+      <button type="button" className="template-gallery-head" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+        <LayoutTemplate size={16} />
+        <strong>Start from a template</strong>
+        <span className="muted small">{BANNER_TEMPLATES.length} ready-made banners with artwork. Nothing goes live until you save.</span>
+        <ChevronDown size={16} className={open ? "is-open" : ""} />
+      </button>
+      {open && (
+        <>
+          <div className="chip-row">
+            {(["all", ...groups] as const).map((g) => (
+              <button key={g} type="button" className={`chip ${group === g ? "is-active" : ""}`} onClick={() => setGroup(g)}>
+                {g === "all" ? "All" : TEMPLATE_GROUP_LABEL[g]}
+              </button>
+            ))}
+          </div>
+          <div className="template-grid">
+            {shown.map((t) => (
+              <article key={t.key} className="template-tile">
+                <div className="template-tile-preview" style={{ background: palette.background }}>
+                  <BannerPreview banner={{ ...t.banner, imageUrl: templateImageUrl(t), placement: t.banner.placement }} palette={palette} full />
+                </div>
+                <div className="template-tile-body">
+                  <strong>{t.name}</strong>
+                  <span className="muted small">
+                    {BANNER_PLACEMENT_LABEL[t.banner.placement]} · {t.banner.layout === "image" ? "Image" : t.banner.layout === "card" ? "Card" : "Strip"}
+                  </span>
+                  {t.setupNote && <span className="warn small">{t.setupNote}</span>}
+                </div>
+                <button type="button" className="btn btn-ghost" onClick={() => onPick(t)} disabled={!canManage}>
+                  <Plus size={15} /> Use template
+                </button>
+              </article>
+            ))}
+          </div>
+        </>
+      )}
+    </section>
+  );
+};
+
 export const BannersPage: React.FC = () => {
   const { banners, setBanners, canManage, config } = useCms();
   const toast = useToast();
   const [editing, setEditing] = useState<Banner | "new" | null>(null);
+  const [template, setTemplate] = useState<BannerInput | undefined>();
+
+  // The editor shows the bundled artwork; handleSave uploads it to S3.
+  const pickTemplate = (t: BannerTemplate) => {
+    setTemplate({ ...t.banner, imageUrl: templateImageUrl(t) });
+    setEditing("new");
+  };
   const [filter, setFilter] = useState<"current" | "all">("current");
   const palette = useMemo(() => resolvePalette("light", config!.theme), [config]);
 
@@ -332,6 +406,10 @@ export const BannersPage: React.FC = () => {
   };
 
   const toggleActive = async (b: Banner) => {
+    if (!b.active && (PLACEHOLDER.test(b.action.value ?? "") || PLACEHOLDER.test(b.action.fallbackUrl ?? ""))) {
+      toast("error", "Replace the YOUR-… placeholder in its link first.");
+      return setEditing(b);
+    }
     try {
       const { banner } = await updateBanner(b._id, { ...b, active: !b.active });
       setBanners((all) => all.map((x) => (x._id === b._id ? { ...x, ...banner } : x)));
@@ -355,6 +433,8 @@ export const BannersPage: React.FC = () => {
       >
         Promo cards on Home and in the hubs. Schedule them, point them at a screen or a website, and see how many taps they get.
       </PageHeader>
+
+      {canManage && <TemplateGallery onPick={pickTemplate} />}
 
       <div className="toolbar">
         <Segmented
@@ -417,7 +497,16 @@ export const BannersPage: React.FC = () => {
         </div>
       )}
 
-      {editing && <BannerEditor initial={editing === "new" ? null : editing} onClose={() => setEditing(null)} />}
+      {editing && (
+        <BannerEditor
+          initial={editing === "new" ? null : editing}
+          template={editing === "new" ? template : undefined}
+          onClose={() => {
+            setEditing(null);
+            setTemplate(undefined);
+          }}
+        />
+      )}
     </div>
   );
 };

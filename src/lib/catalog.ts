@@ -1,4 +1,4 @@
-import type { ActionType, AudienceSegment, BannerPlacement, FeaturePlacement, ThemeMode, ThemeOverrides, ThemeToken } from "./api";
+import type { ActionType, AudienceSegment, BannerPlacement, CmsConfig, FeaturePlacement, HomeSection, ThemeMode, ThemeOverrides, ThemeToken } from "./api";
 
 export const PLACEMENT_LABEL: Record<FeaturePlacement, string> = {
   care_hub: "Care & Insights",
@@ -202,3 +202,31 @@ export const relativeTime = (iso?: string | null) => {
   if (diff < 86400) return `${Math.round(diff / 3600)} h ago`;
   return new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 };
+
+// <input type="datetime-local"> works in the browser's local time; the API takes ISO.
+export const toLocalInput = (iso: string | null) => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+};
+export const fromLocalInput = (v: string) => (v ? new Date(v).toISOString() : null);
+
+/** The saved hub title overrides, for the phone previews. */
+export const hubTitlesOf = (c: CmsConfig): Partial<Record<FeaturePlacement, string | null>> =>
+  Object.fromEntries(Object.entries(c.screenTitles ?? {}).map(([screen, t]) => [screen, t?.title ?? null]));
+
+/**
+ * The block that holds a screen's tiles: Shortcuts on Home and Profile,
+ * Feature tiles on a hub. Screen layouts owns it (on/off, audience, dates);
+ * Features & tiles owns what's inside. Undefined on a backend without screen layouts.
+ */
+export const tileBlockOf = (c: CmsConfig, placement: FeaturePlacement): HomeSection | undefined =>
+  placement === "home"
+    ? c.homeSections.find((s) => s.key === "shortcuts")
+    : c.screenSections?.[placement]?.find((s) => s.key === (placement === "profile" ? "shortcuts" : "tiles"));
+
+/** The Screen layouts page, opened on `placement`'s screen. */
+export const layoutLink = (placement: FeaturePlacement) => (placement === "home" ? "/layout" : `/layout?screen=${placement}`);
+
+/** The hub's name as the app shows it: its title override from Screen layouts, else the default. */
+export const screenName = (c: CmsConfig, placement: FeaturePlacement) => c.screenTitles?.[placement as keyof typeof c.screenTitles]?.title || PLACEMENT_LABEL[placement];

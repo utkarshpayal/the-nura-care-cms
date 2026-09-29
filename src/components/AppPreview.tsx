@@ -53,7 +53,7 @@ import {
   type LucideIcon
 } from "lucide-react";
 import React, { createContext, useContext, useState } from "react";
-import type { Banner, CustomTile, Feature, FeaturePlacement, FeatureSize, HomeSection, Launch, ThemeMode } from "../lib/api";
+import type { Banner, CustomTile, Feature, FeaturePlacement, FeatureSize, HomeSection, Launch, LayoutScreen, ScreenSection, ThemeMode } from "../lib/api";
 import { PLACEMENT_LABEL } from "../lib/catalog";
 
 /*
@@ -492,54 +492,155 @@ type ScreenProps = {
   viewAs?: ViewAs;
 };
 
-export const HubScreen: React.FC<ScreenProps & { placement: FeaturePlacement }> = ({ placement, features, links, banners, palette, viewAs }) => {
+/** The keys of the shown blocks, in order; every block while `sections` hasn't loaded (an older backend). */
+const shownKeys = (sections: ScreenSection[] | undefined, fallback: string[]) =>
+  sections ? sections.filter((s) => s.visible).map((s) => s.key) : fallback;
+
+/** A block's text override, else `fallback`. */
+const textOf = (sections: HomeSection[] | undefined, key: string, fallback: string) =>
+  sections?.find((s) => s.key === key)?.text?.trim() || fallback;
+
+/** Hub title overrides, e.g. `{ care_hub: "Health" }`. */
+export type HubTitles = Partial<Record<FeaturePlacement, string | null>>;
+
+const HUB_INTRO: Partial<Record<FeaturePlacement, string>> = {
+  care_hub: "Forecasts and insights for your health.",
+  wellness_hub: "Support for your body and mind — private, judgment-free, and always here.",
+  explore_hub: "Community, content, and everything to explore beyond tracking."
+};
+
+export const HubScreen: React.FC<ScreenProps & { placement: FeaturePlacement; sections?: ScreenSection[]; title?: string | null }> = ({
+  placement,
+  sections,
+  title,
+  features,
+  links,
+  banners,
+  palette,
+  viewAs
+}) => {
   const tiles = tilesIn(features, links, placement, viewAs);
+  const render = (key: string) => {
+    switch (key) {
+      case "intro":
+        return (
+          <p className="pv-intro" style={{ color: palette.mutedText }}>
+            {textOf(sections, "intro", HUB_INTRO[placement] ?? "")}
+          </p>
+        );
+      case "promo":
+        return <BannerRow banners={liveBannersIn(banners, placement)} palette={palette} />;
+      case "tiles":
+        return tiles.length > 0 ? (
+          <TileGrid tiles={tiles} palette={palette} />
+        ) : (
+          <p className="pv-empty" style={{ color: palette.mutedText }}>
+            Nothing here — this hub's card is hidden on Home.
+          </p>
+        );
+      default:
+        return null;
+    }
+  };
   return (
     <div className="pv-body">
       <div className="pv-header" style={{ color: palette.foreground }}>
         <span className="pv-back" style={{ background: palette.surface, borderColor: palette.border }}>
           <ChevronLeft size={12} />
         </span>
-        <strong>{PLACEMENT_LABEL[placement]}</strong>
+        <strong>{title?.trim() || PLACEMENT_LABEL[placement]}</strong>
       </div>
-      <BannerRow banners={liveBannersIn(banners, placement)} palette={palette} />
-      {tiles.length > 0 ? (
-        <TileGrid tiles={tiles} palette={palette} />
-      ) : (
-        <p className="pv-empty" style={{ color: palette.mutedText }}>
-          Nothing here — this hub's card is hidden on Home.
-        </p>
-      )}
+      {shownKeys(sections, ["intro", "promo", "tiles"]).map((key) => (
+        <React.Fragment key={key}>{render(key)}</React.Fragment>
+      ))}
     </div>
   );
 };
 
-export const ProfileScreen: React.FC<ScreenProps> = ({ features, links, banners, palette, viewAs }) => (
-  <div className="pv-body">
-    <div className="pv-profile-head" style={{ color: palette.foreground }}>
-      <span className="pv-avatar" style={{ background: palette.primaryLight, color: palette.primary }}>
-        P
-      </span>
-      <strong>Priya Tester</strong>
-      <span style={{ color: palette.mutedText }}>priya@example.com</span>
-    </div>
-    <div className="pv-menu" style={{ background: palette.surface, borderColor: palette.border }}>
-      {["Achievements", "Preferences & Settings", "My Subscription", "Government Schemes", "Help & Support"].map((row) => (
-        <div key={row} style={{ borderColor: palette.border, color: palette.foreground }}>
-          {row} <ChevronRight size={10} color={palette.mutedText} />
+const PROFILE_MENUS: Record<string, { title: string; rows: string[] }> = {
+  account: { title: "Your account", rows: ["Achievements", "My subscription", "Government schemes & benefits"] },
+  preferences: { title: "Preferences", rows: ["Notifications & display"] },
+  privacyHelp: { title: "Privacy & help", rows: ["App lock", "Data privacy & security", "Help & support"] }
+};
+
+export const ProfileScreen: React.FC<ScreenProps & { sections?: ScreenSection[] }> = ({ sections, features, links, banners, palette, viewAs }) => {
+  const render = (key: string) => {
+    const menu = PROFILE_MENUS[key];
+    if (menu) {
+      return (
+        <div>
+          <div className="pv-section-title" style={{ color: palette.foreground }}>
+            {textOf(sections, key, menu.title)}
+          </div>
+          <div className="pv-menu" style={{ background: palette.surface, borderColor: palette.border }}>
+            {menu.rows.map((row) => (
+              <div key={row} style={{ borderColor: palette.border, color: palette.foreground }}>
+                {row} <ChevronRight size={10} color={palette.mutedText} />
+              </div>
+            ))}
+          </div>
         </div>
+      );
+    }
+    switch (key) {
+      case "identity":
+        return (
+          <div className="pv-profile-head" style={{ color: palette.foreground }}>
+            <span className="pv-avatar" style={{ background: palette.primaryLight, color: palette.primary }}>
+              P
+            </span>
+            <strong>Priya Tester</strong>
+            <span style={{ color: palette.mutedText }}>priya@example.com</span>
+          </div>
+        );
+      case "completeProfile":
+        return (
+          <div className="pv-insight-card" style={{ background: palette.primaryLight, borderColor: palette.primaryLight }}>
+            <strong style={{ color: palette.foreground }}>Complete your profile</strong>
+            <span style={{ color: palette.mutedText }}>Only shows while the photo or phone is missing.</span>
+          </div>
+        );
+      case "stats":
+        return (
+          <div className="pv-stats">
+            {[
+              ["12", "Days tracked"],
+              ["120", "Care points"],
+              ["5", "Day streak"]
+            ].map(([value, label]) => (
+              <span key={label} style={{ background: palette.surface, color: palette.mutedText }}>
+                <b style={{ color: palette.foreground }}>{value}</b>
+                {label}
+              </span>
+            ))}
+          </div>
+        );
+      case "promo":
+        return <BannerRow banners={liveBannersIn(banners, "profile")} palette={palette} />;
+      case "shortcuts":
+        return <Shortcuts tiles={tilesIn(features, links, "profile", viewAs)} palette={palette} />;
+      case "logout":
+        return (
+          <span className="pv-logout" style={{ color: palette.primary }}>
+            Log out
+          </span>
+        );
+      default:
+        return null;
+    }
+  };
+  return (
+    <div className="pv-body">
+      {shownKeys(sections, ["identity", "completeProfile", "stats", "account", "preferences", "privacyHelp", "promo", "shortcuts", "logout"]).map((key) => (
+        <React.Fragment key={key}>{render(key)}</React.Fragment>
       ))}
     </div>
-    <BannerRow banners={liveBannersIn(banners, "profile")} palette={palette} />
-    <Shortcuts tiles={tilesIn(features, links, "profile", viewAs)} palette={palette} />
-    <span className="pv-logout" style={{ color: palette.primary }}>
-      Log out
-    </span>
-  </div>
-);
+  );
+};
 
-export const HomeScreen: React.FC<ScreenProps & { sections: HomeSection[]; mode: ThemeMode; showPopup?: boolean }> = ({
+export const HomeScreen: React.FC<ScreenProps & { sections: HomeSection[]; mode: ThemeMode; showPopup?: boolean; hubTitles?: HubTitles }> = ({
   sections,
+  hubTitles,
   features,
   links,
   banners,
@@ -626,7 +727,7 @@ export const HomeScreen: React.FC<ScreenProps & { sections: HomeSection[]; mode:
         return (
           <div className="pv-insights">
             <div className="pv-section-title" style={{ color: palette.foreground }}>
-              Insights <span style={{ color: palette.primary }}>See all</span>
+              {textOf(sections, "insights", "Insights")} <span style={{ color: palette.primary }}>See all</span>
             </div>
             <div className="pv-insight-card" style={{ background: palette.surface, borderColor: palette.border }}>
               <strong style={{ color: palette.foreground }}>Cycle health</strong>
@@ -640,11 +741,11 @@ export const HomeScreen: React.FC<ScreenProps & { sections: HomeSection[]; mode:
         return (
           <div className="pv-more">
             <div className="pv-section-title" style={{ color: palette.foreground }}>
-              More for you
+              {textOf(sections, "moreForYou", "More for you")}
             </div>
             {hubs.map((p) => (
               <div key={p} className="pv-hub-row" style={{ background: palette.surface, borderColor: palette.border }}>
-                <strong style={{ color: palette.foreground }}>{PLACEMENT_LABEL[p]}</strong>
+                <strong style={{ color: palette.foreground }}>{hubTitles?.[p]?.trim() || PLACEMENT_LABEL[p]}</strong>
                 <span style={{ color: palette.mutedText }}>{tilesIn(features, links, p, viewAs).length} tiles</span>
                 <ArrowRight size={11} color={palette.primary} />
               </div>
@@ -678,8 +779,17 @@ export const HomeScreen: React.FC<ScreenProps & { sections: HomeSection[]; mode:
 };
 
 /** Render whichever screen a placement lives on. */
-export const ScreenFor: React.FC<ScreenProps & { placement: FeaturePlacement; sections: HomeSection[]; mode: ThemeMode }> = (props) => {
-  if (props.placement === "home") return <HomeScreen {...props} />;
-  if (props.placement === "profile") return <ProfileScreen {...props} />;
-  return <HubScreen {...props} />;
+export const ScreenFor: React.FC<
+  ScreenProps & {
+    placement: FeaturePlacement;
+    sections: HomeSection[];
+    screenSections?: Record<LayoutScreen, ScreenSection[]>;
+    hubTitles?: HubTitles;
+    mode: ThemeMode;
+  }
+> = ({ screenSections, hubTitles, ...props }) => {
+  if (props.placement === "home") return <HomeScreen {...props} hubTitles={hubTitles} />;
+  const sections = screenSections?.[props.placement];
+  if (props.placement === "profile") return <ProfileScreen {...props} sections={sections} />;
+  return <HubScreen {...props} sections={sections} title={hubTitles?.[props.placement]} />;
 };

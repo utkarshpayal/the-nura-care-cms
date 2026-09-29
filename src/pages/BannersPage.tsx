@@ -8,13 +8,14 @@ import {
   BannerPlacement,
   BannerStatus,
   FeaturePlacement,
+  LayoutScreen,
   createBanner,
   deleteBanner,
   errorMessage,
   updateBanner,
   uploadImage
 } from "../lib/api";
-import { BANNER_PLACEMENT_LABEL, isColor, relativeTime, resolvePalette, toHex6 } from "../lib/catalog";
+import { BANNER_PLACEMENT_LABEL, fromLocalInput, hubTitlesOf, isColor, relativeTime, resolvePalette, toHex6, toLocalInput } from "../lib/catalog";
 import { useCms } from "../lib/store";
 import {
   BANNER_TEMPLATES,
@@ -58,13 +59,6 @@ const EMPTY: BannerInput = {
   endAt: null
 };
 
-// <input type="datetime-local"> works in the browser's local time; the API takes ISO.
-const toLocalInput = (iso: string | null) => {
-  if (!iso) return "";
-  const d = new Date(iso);
-  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-};
-const fromLocalInput = (v: string) => (v ? new Date(v).toISOString() : null);
 
 /** Status the draft would have right now (for the preview and the save note). */
 const draftStatus = (b: BannerInput): BannerStatus => {
@@ -298,16 +292,19 @@ const BannerEditor: React.FC<{ initial: Banner | null; template?: BannerInput; o
             <p className="muted small">In {BANNER_PLACEMENT_LABEL[draft.placement]}</p>
             <PhoneFrame palette={palette}>
               {isHome ? (
-                <HomeScreen {...screenProps} sections={config!.homeSections} mode="light" showPopup={draft.placement === "popup"} />
+                <HomeScreen {...screenProps} sections={config!.homeSections} hubTitles={hubTitlesOf(config!)} mode="light" showPopup={draft.placement === "popup"} />
               ) : draft.placement === "profile" ? (
-                <ProfileScreen {...screenProps} />
+                <ProfileScreen {...screenProps} sections={config!.screenSections?.profile} />
               ) : (
-                <HubScreen {...screenProps} placement={draft.placement as FeaturePlacement} />
+                <HubScreen {...screenProps} placement={draft.placement as FeaturePlacement} sections={config!.screenSections?.[draft.placement as LayoutScreen]} title={config!.screenTitles?.[draft.placement as LayoutScreen]?.title} />
               )}
             </PhoneFrame>
             {draft.placement === "popup" && <p className="muted small">Shown once per device, a moment after Home opens. A new campaign needs a new banner.</p>}
             {(draft.placement === "home_top" || draft.placement === "home_middle") && !config!.homeSections.find((s) => s.key === (draft.placement === "home_top" ? "promo_top" : "promo_middle"))?.visible && (
-              <p className="warn small">This slot is hidden in Home layout, so the banner won't show until you turn it on there.</p>
+              <p className="warn small">This slot is hidden in Screen layouts, so the banner won't show until you turn it on there.</p>
+            )}
+            {!isHome && config!.screenSections?.[draft.placement as LayoutScreen]?.find((s) => s.key === "promo")?.visible === false && (
+              <p className="warn small">Promo banners are hidden on this screen in Screen layouts, so the banner won't show until you turn them on there.</p>
             )}
           </div>
         </div>

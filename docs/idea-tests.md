@@ -15,7 +15,7 @@ We tease four ideas in the app as **Coming soon** before building any of them. T
 
 ## The four ideas
 
-Add each one as a **link tile** in Screens & features:
+Add each one as a **link tile** in Features & tiles:
 
 - Set the tap action to **Nothing** (this makes it a teaser).
 - Set the launch state to **Coming soon**, headline "Coming soon".

@@ -1,5 +1,5 @@
 // Launch states (docs/launch-states.md): labels, validation, recipes and the
-// warnings shared by Screens & features, Launches, Overview and Banners.
+// warnings shared by Features & tiles, Launches, Overview and Banners.
 import { CustomTile, DEFAULT_LAUNCH, EVERYONE, Feature, Launch, LaunchHeadline, LaunchState, TapAction } from "./api";
 import { actionError, audienceError } from "../components/editors";
 
@@ -176,7 +176,7 @@ export const featureForRoute = (features: Feature[], route: string | null | unde
 /** Items (feature or link tile) with their stats key, for lists across both kinds. */
 export type LaunchItem = {
   itemKey: string;
-  /** The id Screens & features uses for the row (to open it via ?open=). */
+  /** The id Features & tiles uses for the row (to open it via ?open=). */
   rowId: string | null;
   kind: "feature" | "link";
   title: string;

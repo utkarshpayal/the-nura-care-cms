@@ -13,7 +13,11 @@ import {
   getMe,
   getToken,
   listBanners,
+  revokeSession,
   login as apiLogin,
+  verifyLoginCode,
+  SecondStepRequired,
+  type LoginChallenge,
   onUnauthorized,
   setToken,
   withLaunches
@@ -25,7 +29,9 @@ type AuthState = {
   user: StaffUser | null;
   permissions: string[];
   checking: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  /** Resolves to the emailed-code step when the backend asks for one. */
+  login: (email: string, password: string) => Promise<LoginChallenge | null>;
+  verifyCode: (challengeToken: string, code: string) => Promise<void>;
   logout: () => void;
 };
 
@@ -36,6 +42,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [checking, setChecking] = useState(Boolean(getToken()));
 
   const logout = useCallback(() => {
+    // End the session on the server too; fire and forget.
+    revokeSession();
     setToken(null);
     setUser(null);
   }, []);
@@ -53,13 +61,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [logout]);
 
   const login = useCallback(async (email: string, password: string) => {
-    const u = await apiLogin(email, password);
-    setUser(u);
+    try {
+      setUser(await apiLogin(email, password));
+      return null;
+    } catch (err) {
+      if (err instanceof SecondStepRequired) return err.challenge;
+      throw err;
+    }
+  }, []);
+
+  const verifyCode = useCallback(async (challengeToken: string, code: string) => {
+    setUser(await verifyLoginCode(challengeToken, code));
   }, []);
 
   const value = useMemo(
-    () => ({ user, permissions: user?.access?.permissions ?? [], checking, login, logout }),
-    [user, checking, login, logout]
+    () => ({ user, permissions: user?.access?.permissions ?? [], checking, login, verifyCode, logout }),
+    [user, checking, login, verifyCode, logout]
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

@@ -287,6 +287,12 @@ export const onUnauthorized = (fn: () => void) => {
   unauthorizedHandler = fn;
 };
 
+// Cookie sessions (backend utils/sessionCookie.js): the token lives in an
+// httpOnly cookie this page can't read, and this marker takes its place in
+// localStorage so "signed in?" checks keep working.
+const COOKIE_SESSION = "cookie-session";
+const isCookieSession = (token: string) => token === COOKIE_SESSION;
+
 export const getToken = () => {
   try {
     return localStorage.getItem(TOKEN_KEY) ?? "";
@@ -312,12 +318,17 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   const headers = new Headers(init.headers);
   const token = getToken();
-  if (token) headers.set("Authorization", `Bearer ${token}`);
+  if (token && !isCookieSession(token)) headers.set("Authorization", `Bearer ${token}`);
   if (init.body && !(init.body instanceof FormData)) headers.set("Content-Type", "application/json");
 
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}${path}`, { ...init, headers, signal: controller.signal });
+    res = await fetch(`${API_BASE}${path}`, {
+      ...init,
+      headers,
+      credentials: "include",
+      signal: controller.signal
+    });
   } catch (err) {
     throw new ApiError(
       (err as Error).name === "AbortError"
@@ -350,16 +361,89 @@ const send = async <T>(method: string, path: string, body?: unknown) =>
 
 /* ---------------------------------- Auth --------------------------------- */
 
-export async function login(email: string, password: string): Promise<StaffUser> {
-  const res = await request<Envelope<StaffUser>>("/api/auth/login", {
+/** Staff confirm sign-in with an emailed code (backend STAFF_2FA_ENABLED). */
+export type LoginChallenge = {
+  challengeToken: string;
+  /** "totp": the code comes from their authenticator app (or a recovery code). */
+  method?: "email" | "totp";
+  sentTo?: string;
+  expiresInMinutes?: number;
+};
+
+export class SecondStepRequired extends Error {
+  constructor(public challenge: LoginChallenge, message: string) {
+    super(message);
+  }
+}
+
+// Ask for the session in an httpOnly cookie (only honoured when the backend
+// has STAFF_COOKIE_AUTH on; otherwise the token comes back as before).
+const authPost = (path: string, body: unknown) =>
+  request<Envelope<StaffUser>>(path, {
     method: "POST",
-    body: JSON.stringify({ email, password })
+    headers: { "X-Session-Mode": "cookie" },
+    body: JSON.stringify(body)
   });
+
+/**
+ * The backend set the session cookie. Check the browser really sends it back
+ * (it won't when the CMS runs on another domain, e.g. a preview deploy)
+ * before dropping the token.
+ */
+const cookieWorks = async () => {
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/profile`, { credentials: "include" });
+    return res.ok;
+  } catch {
+    return false;
+  }
+};
+
+const startSession = async (res: Envelope<StaffUser>): Promise<StaffUser> => {
   const token = res.token ?? (res.data as unknown as { token?: string })?.token;
   if (!token) throw new ApiError("Sign-in didn't return a session. Try again.", 500);
-  setToken(token);
+  const cookie = (res.data as { sessionMode?: string })?.sessionMode === "cookie" && (await cookieWorks());
+  setToken(cookie ? COOKIE_SESSION : token);
   return res.data;
+};
+
+export async function login(email: string, password: string): Promise<StaffUser> {
+  setToken(null);
+  const res = await authPost("/api/auth/login", { email, password });
+  const challenge = res.data as unknown as LoginChallenge & { twoFactorRequired?: boolean };
+  if (challenge?.twoFactorRequired && challenge.challengeToken) {
+    throw new SecondStepRequired(challenge, res.message ?? "Enter the code we emailed you.");
+  }
+  return startSession(res);
 }
+
+export async function verifyLoginCode(challengeToken: string, code: string): Promise<StaffUser> {
+  return startSession(await authPost("/api/auth/login/verify-code", { challengeToken, code }));
+}
+
+export async function resendLoginCode(challengeToken: string): Promise<string> {
+  const res = await authPost("/api/auth/login/resend-code", { challengeToken });
+  return res.message ?? "We sent you a new code.";
+}
+
+/**
+ * End this browser's session on the server, so the token stops working now
+ * rather than when it expires (12 hours for staff). Fire and forget.
+ */
+export const revokeSession = () => {
+  const token = getToken();
+  if (!token || !API_BASE) return;
+  fetch(`${API_BASE}/api/auth/logout`, {
+    method: "POST",
+    headers: {
+      ...(isCookieSession(token) ? {} : { Authorization: `Bearer ${token}` }),
+      "Content-Type": "application/json"
+    },
+    body: "{}",
+    credentials: "include",
+    keepalive: true
+  }).catch(() => undefined);
+};
 
 export const getMe = () => get<{ user: StaffUser; access: StaffUser["access"] }>("/api/admin/me");
 

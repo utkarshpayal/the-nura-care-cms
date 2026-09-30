@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, LayoutGrid, Megaphone, Palette, Rocket, Rows3 } from "lucide-react";
-import { resolvePalette, relativeTime, staffName } from "../lib/catalog";
+import { hubTitlesOf, relativeTime, resolvePalette, staffName } from "../lib/catalog";
 import { useCms } from "../lib/store";
 import { launchItems } from "../lib/launch";
 import { HomeScreen, PhoneFrame } from "../components/AppPreview";
@@ -13,7 +13,8 @@ export const OverviewPage: React.FC = () => {
   const c = config!;
 
   const shown = c.features.filter((f) => f.enabled).length;
-  const hiddenSections = c.homeSections.filter((s) => !s.visible).length;
+  const layoutSections = [...c.homeSections, ...Object.values(c.screenSections ?? {}).flat()];
+  const hiddenSections = layoutSections.filter((s) => !s.visible).length;
   const live = banners.filter((b) => b.status === "live").length;
   const scheduled = banners.filter((b) => b.status === "scheduled").length;
   const taps = banners.reduce((sum, b) => sum + b.clickCount, 0);
@@ -43,11 +44,11 @@ export const OverviewPage: React.FC = () => {
       note: [`${soon} coming soon`, `${rolling} rolling out`, `${paused.length} paused`, waiting ? `${waiting.toLocaleString()} waiting` : null].filter(Boolean).join(" · ")
     },
     {
-      to: "/home-layout",
+      to: "/layout",
       icon: Rows3,
-      title: "Home layout",
-      value: `${c.homeSections.length - hiddenSections} sections`,
-      note: hiddenSections ? `${hiddenSections} hidden` : "All sections visible"
+      title: "Screen layouts",
+      value: `${1 + Object.keys(c.screenSections ?? {}).length} screens`,
+      note: hiddenSections ? `${hiddenSections} block${hiddenSections === 1 ? "" : "s"} hidden` : "All blocks visible"
     },
     {
       to: "/banners",
@@ -145,7 +146,7 @@ export const OverviewPage: React.FC = () => {
         <aside className="preview-col">
           <p className="muted small center">Home screen right now</p>
           <PhoneFrame palette={palette}>
-            <HomeScreen sections={c.homeSections} features={c.features} links={c.customTiles} banners={banners} palette={palette} mode="light" />
+            <HomeScreen sections={c.homeSections} hubTitles={hubTitlesOf(c)} features={c.features} links={c.customTiles} banners={banners} palette={palette} mode="light" />
           </PhoneFrame>
         </aside>
       </div>

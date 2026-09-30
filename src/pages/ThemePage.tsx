@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 import { ThemeMode, ThemeOverrides, errorMessage, saveTheme } from "../lib/api";
-import { THEME_PRESETS, TOKEN_GROUPS, isColor, resolvePalette, toHex6, tokenByKey } from "../lib/catalog";
+import { hubTitlesOf, isColor, resolvePalette, THEME_PRESETS, toHex6, TOKEN_GROUPS, tokenByKey } from "../lib/catalog";
 import { isConflict, useCms } from "../lib/store";
 import { HomeScreen, HubScreen, PhoneFrame } from "../components/AppPreview";
 import { PageHeader, SaveBar, Segmented, useToast } from "../components/ui";
@@ -184,9 +184,9 @@ export const ThemePage: React.FC = () => {
           </div>
           <PhoneFrame palette={palette}>
             {screen === "home" ? (
-              <HomeScreen sections={config!.homeSections} features={config!.features} links={config!.customTiles} banners={banners} palette={palette} mode={mode} />
+              <HomeScreen sections={config!.homeSections} hubTitles={hubTitlesOf(config!)} features={config!.features} links={config!.customTiles} banners={banners} palette={palette} mode={mode} />
             ) : (
-              <HubScreen placement="care_hub" features={config!.features} links={config!.customTiles} banners={banners} palette={palette} />
+              <HubScreen placement="care_hub" sections={config!.screenSections?.care_hub} title={config!.screenTitles?.care_hub?.title} features={config!.features} links={config!.customTiles} banners={banners} palette={palette} />
             )}
           </PhoneFrame>
         </aside>

@@ -6,8 +6,9 @@ import { useCms } from "../lib/store";
 import { ErrorState, Loading, PageHeader, Segmented, useToast } from "../components/ui";
 
 const SECTION_LABEL: Record<ConfigSection, string> = {
-  features: "Screens & features",
+  features: "Features & tiles",
   homeSections: "Home layout",
+  screenSections: "Profile & hub layouts",
   theme: "Theme",
   settings: "App settings"
 };
@@ -29,6 +30,12 @@ const summarize = (r: Revision) => {
     case "homeSections": {
       const hidden = (d.homeSections ?? []).filter((s: any) => s.visible === false).length;
       return hidden ? `${hidden} section${hidden === 1 ? "" : "s"} hidden` : "All sections visible";
+    }
+    case "screenSections": {
+      const lists = Object.values((d.screenSections ?? {}) as Record<string, any[]>);
+      const hidden = lists.flat().filter((s: any) => s?.visible === false).length;
+      const screens = `${lists.length} screen${lists.length === 1 ? "" : "s"} arranged`;
+      return hidden ? `${screens} · ${hidden} block${hidden === 1 ? "" : "s"} hidden` : `${screens} · all blocks visible`;
     }
     case "theme": {
       const n = Object.keys(d.theme?.light ?? {}).length + Object.keys(d.theme?.dark ?? {}).length;

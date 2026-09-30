@@ -128,7 +128,7 @@ export type CustomTile = {
   launch: Launch;
 };
 
-export type ConfigSection = "features" | "homeSections" | "theme" | "settings";
+export type ConfigSection = "features" | "homeSections" | "screenSections" | "theme" | "settings";
 
 export type AppSettings = {
   maintenance: { enabled: boolean; title: string; message: string };
@@ -170,7 +170,30 @@ export type Feature = {
   defaults: { title: string; description: string; placement: FeaturePlacement; size: FeatureSize; colorKey: string };
 };
 
-export type HomeSection = { key: string; label: string; visible: boolean; order: number };
+/**
+ * A block on Home or another screen. `text` overrides its heading or intro
+ * (null = the app's `textDefault`; only blocks with a `textLabel` have one);
+ * `audience` and `startAt` / `endAt` narrow who sees it and when.
+ */
+export type HomeSection = {
+  key: string;
+  label: string;
+  visible: boolean;
+  order: number;
+  text: string | null;
+  textLabel?: string;
+  textDefault?: string;
+  textMax?: number;
+  audience: Audience;
+  startAt: string | null;
+  endAt: string | null;
+};
+
+/** Screens other than Home whose blocks can be reordered or hidden. */
+export type LayoutScreen = "profile" | "care_hub" | "wellness_hub" | "explore_hub";
+export const LAYOUT_SCREENS: LayoutScreen[] = ["profile", "care_hub", "wellness_hub", "explore_hub"];
+/** `required` blocks can be moved but not hidden. */
+export type ScreenSection = HomeSection & { required?: boolean };
 
 export type ThemeOverrides = Record<ThemeMode, Record<string, string>>;
 
@@ -202,6 +225,10 @@ export type CmsConfig = {
   features: Feature[];
   customTiles: CustomTile[];
   homeSections: HomeSection[];
+  /** Missing from a backend that predates screen layouts. */
+  screenSections?: Record<LayoutScreen, ScreenSection[]>;
+  /** Hub title overrides (null = the app's `default`). */
+  screenTitles?: Partial<Record<LayoutScreen, { title: string | null; default: string }>>;
   theme: ThemeOverrides;
   settings: AppSettings;
   catalog: Catalog;
@@ -389,11 +416,36 @@ export const listRevisions = (section?: ConfigSection) =>
 
 export const restoreRevision = (id: string) => send<SavedConfig>("POST", `/api/cms/revisions/${id}/restore`);
 
+/** What the API takes for a block: its place in the list is its order. */
+const sectionPayload = ({ key, visible, text, audience, startAt, endAt }: HomeSection, order: number) => ({
+  key,
+  visible,
+  order,
+  text: text?.trim() || null,
+  audience,
+  startAt,
+  endAt
+});
+
 export const saveHomeSections = (version: number, homeSections: HomeSection[]) =>
-  send<SavedConfig>("PUT", "/api/cms/home", {
+  send<SavedConfig>("PUT", "/api/cms/home", { version, homeSections: homeSections.map(sectionPayload) });
+
+/** One screen's blocks; `version` is `sectionVersions.screenSections`. */
+export const saveScreenSections = (version: number, screen: LayoutScreen, sections: ScreenSection[], title?: string | null) =>
+  send<SavedConfig>("PUT", `/api/cms/screens/${screen}`, {
     version,
-    homeSections: homeSections.map(({ key, visible }, order) => ({ key, visible, order }))
+    sections: sections.map(sectionPayload),
+    ...(title !== undefined && { title: title?.trim() || null })
   });
+
+/* ---------------------------------- Usage --------------------------------- */
+
+export type UsageRange = 7 | 30 | 90;
+/** Per item key (feature key or `link:<id>`); `daily` lines up with `days`. */
+export type UsageItem = { opens: number; taps: number; devices: number; daily: { opens: number; taps: number }[] };
+export type UsageReport = { days: string[]; items: Record<string, UsageItem> };
+
+export const getUsage = (days: UsageRange) => get<UsageReport>(`/api/cms/usage?days=${days}`);
 
 export const saveTheme = (version: number, theme: ThemeOverrides) =>
   send<SavedConfig>("PUT", "/api/cms/theme", { version, theme });

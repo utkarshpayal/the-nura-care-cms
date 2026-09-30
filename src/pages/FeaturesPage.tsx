@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { ArrowDown, ArrowUp, Bell, ChevronDown, ChevronUp, ExternalLink, EyeOff, GripVertical, Link2, Plus, RotateCcw, Trash2, Users } from "lucide-react";
 import { CustomTile, DEFAULT_LAUNCH, EVERYONE, Feature, FeaturePlacement, Launch, LaunchStats, errorMessage, saveFeatures } from "../lib/api";
 import { launchConfirm, launchError, launchPill, teaserError } from "../lib/launch";
-import { COLOR_LABEL, PLACEMENT_HINT, PLACEMENT_LABEL, resolvePalette } from "../lib/catalog";
+import { COLOR_LABEL, hubTitlesOf, layoutLink, PLACEMENT_HINT, PLACEMENT_LABEL, resolvePalette, screenName, tileBlockOf } from "../lib/catalog";
 import { isConflict, useCms } from "../lib/store";
 import { PhoneFrame, ScreenFor, ViewAs } from "../components/AppPreview";
 import { LaunchEditor } from "../components/LaunchEditor";
@@ -48,14 +48,15 @@ export const FeaturesPage: React.FC = () => {
   const initial = useMemo(() => normalize(config!.features, withLocalIds(config!.customTiles)), [config]);
   const [features, setFeatures] = useState<Feature[]>(initial.features);
   const [links, setLinks] = useState<Link[]>(initial.links);
-  // ?open=<row id> (from the Launches page) opens that row's editor on its screen.
+  // ?open=<row id> (from the Launches page) opens that row's editor on its
+  // screen; ?screen=<placement> (from Screen layouts) previews that screen.
   const [open, setOpen] = useState<string | null>(() => params.get("open"));
   const [preview, setPreview] = useState<FeaturePlacement>(() => {
     const id = params.get("open");
     return (
       initial.features.find((f) => f.key === id)?.placement ??
       initial.links.find((l) => `link:${l.localId}` === id)?.placement ??
-      "home"
+      (PLACEMENTS.includes(params.get("screen") as FeaturePlacement) ? (params.get("screen") as FeaturePlacement) : "home")
     );
   });
   const [mode, setMode] = useState<"light" | "dark">("light");
@@ -225,13 +226,43 @@ export const FeaturesPage: React.FC = () => {
     if (dropTarget !== key) setDropTarget(key);
   };
 
+  // Arriving from Screen layouts' "Edit tiles": bring that screen's column into view.
+  useEffect(() => {
+    const screen = params.get("screen");
+    if (screen) document.getElementById(`screen-${screen}`)?.scrollIntoView({ block: "start" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /**
+   * Screen layouts owns the block these tiles sit in; say so when it limits
+   * them, instead of offering a second switch for the same thing here.
+   */
+  const blockNote = (p: FeaturePlacement) => {
+    const block = tileBlockOf(config!, p);
+    if (!block) return null;
+    const name = block.label.split(" (")[0];
+    const who = describeAudience(block.audience ?? EVERYONE);
+    const dated = Boolean(block.startAt || block.endAt);
+    const note = !block.visible
+      ? `The ${name} block is switched off on this screen, so none of these tiles show.`
+      : who || dated
+        ? `The ${name} block only shows${who ? ` to ${who}` : ""}${dated ? " within its dates" : ""}.`
+        : null;
+    return note ? (
+      <p className={block.visible ? "block-note" : "block-note is-off"}>
+        {note} <Link to={layoutLink(p)}>Change in Screen layouts</Link>
+      </p>
+    ) : null;
+  };
+
   const hiddenCount = features.filter((f) => !f.enabled).length + links.filter((l) => !l.enabled).length;
 
   return (
     <div className="page">
-      <PageHeader eyebrow="Show what, where & to whom" title="Screens & features">
-        Drag features and your own link tiles between Home, Profile and the three hubs, reorder them, restyle them and
-        choose who sees them. Link tiles can open a website, another app, or any screen in the app.
+      <PageHeader eyebrow="Show what, where & to whom" title="Features & tiles">
+        The tiles on each screen: drag features and your own link tiles between Home, Profile and the three hubs, reorder them, restyle them, choose who
+        sees them and set their launch state. Link tiles can open a website, another app, or any screen in the app. The rest of each screen (its other
+        blocks, headings and hub names) is in <Link to="/layout">Screen layouts</Link>.
         {hiddenCount > 0 && ` ${hiddenCount} hidden right now.`}
       </PageHeader>
 
@@ -243,6 +274,7 @@ export const FeaturesPage: React.FC = () => {
             return (
               <section
                 key={p}
+                id={`screen-${p}`}
                 className={`card hub-card ${dropTarget === `col:${p}` ? "is-drop" : ""}`}
                 onMouseEnter={() => setPreview(p)}
                 onDragOver={allowDrop(`col:${p}`)}
@@ -251,11 +283,17 @@ export const FeaturesPage: React.FC = () => {
               >
                 <header className="hub-card-head">
                   <div>
-                    <h2>{PLACEMENT_LABEL[p]}</h2>
+                    <h2>{screenName(config!, p)}</h2>
                     <span className="muted small">{PLACEMENT_HINT[p]}</span>
                   </div>
-                  <span className="muted small">{visible} shown</span>
+                  <div className="hub-card-meta">
+                    <span className="muted small">{visible} shown</span>
+                    <Link className="small" to={layoutLink(p)}>
+                      Screen layout →
+                    </Link>
+                  </div>
                 </header>
+                {blockNote(p)}
                 {items.length === 0 && <p className="drop-empty">Drag a feature here, or add a link.</p>}
                 <ul className="feature-list">
                   {items.map((it, i) => {
@@ -379,7 +417,7 @@ export const FeaturesPage: React.FC = () => {
             <select value={preview} onChange={(e) => setPreview(e.target.value as FeaturePlacement)} aria-label="Screen to preview">
               {PLACEMENTS.map((p) => (
                 <option key={p} value={p}>
-                  {PLACEMENT_LABEL[p]}
+                  {screenName(config!, p)}
                 </option>
               ))}
             </select>
@@ -398,7 +436,7 @@ export const FeaturesPage: React.FC = () => {
             />
           </div>
           <PhoneFrame palette={palette}>
-            <ScreenFor placement={preview} features={features} links={links} banners={banners} palette={palette} sections={config!.homeSections} mode={mode} viewAs={viewAs} />
+            <ScreenFor placement={preview} features={features} links={links} banners={banners} palette={palette} sections={config!.homeSections} screenSections={config!.screenSections} hubTitles={hubTitlesOf(config!)} mode={mode} viewAs={viewAs} />
           </PhoneFrame>
           <p className="muted small center">
             {viewAs === "others"

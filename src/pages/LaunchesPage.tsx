@@ -159,7 +159,7 @@ export const LaunchesPage: React.FC = () => {
         type="button"
         className="btn btn-primary sm"
         disabled={item.teaser}
-        title={item.teaser ? "Give it a tap action in Screens & features first" : undefined}
+        title={item.teaser ? "Give it a tap action in Features & tiles first" : undefined}
         onClick={() => publish(item, withState(l, "live"), `Launch “${t}” to everyone in its audience?`, `${t} is live.`)}
       >
         <Rocket size={14} /> Launch
@@ -182,7 +182,7 @@ export const LaunchesPage: React.FC = () => {
               type="button"
               className="btn btn-ghost sm"
               disabled={item.teaser}
-              title={item.teaser ? "Give it a tap action in Screens & features first" : undefined}
+              title={item.teaser ? "Give it a tap action in Features & tiles first" : undefined}
               onClick={() => publish(item, withState(l, "rolling_out"), `Start rolling out “${t}” to ${l.rollout.percent}% of users?`, `${t} is rolling out.`)}
             >
               <Play size={14} /> Start rollout ({l.rollout.percent}%)
@@ -369,7 +369,7 @@ export const LaunchesPage: React.FC = () => {
         {c.updatedAt && ` Last change ${relativeTime(c.updatedAt)} by ${staffName(c.updatedBy)}.`}
       </PageHeader>
 
-      {section("Coming soon", groups.coming_soon, "Nothing teased right now. Open a feature in Screens & features and pick Coming soon.")}
+      {section("Coming soon", groups.coming_soon, "Nothing teased right now. Open a feature in Features & tiles and pick Coming soon.")}
       {section("Rolling out", groups.rolling_out, "No rollouts in progress.")}
       {section("Paused", groups.paused, "Nothing paused.")}
       {section(`Recently launched (last ${RECENT_DAYS} days)`, groups.recent, "Nothing launched in the last two weeks.")}

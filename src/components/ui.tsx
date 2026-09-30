@@ -16,7 +16,8 @@ import {
   Settings2,
   History,
   X,
-  Loader2
+  Loader2,
+  BarChart3
 } from "lucide-react";
 import { useAuth } from "../lib/store";
 import { staffName } from "../lib/catalog";
@@ -58,9 +59,10 @@ export const useToast = () => useContext(ToastContext);
 
 const NAV = [
   { to: "/", label: "Overview", icon: LayoutDashboard, end: true },
-  { to: "/features", label: "Screens & features", icon: LayoutGrid },
+  { to: "/features", label: "Features & tiles", icon: LayoutGrid },
   { to: "/launches", label: "Launches", icon: Rocket },
-  { to: "/home-layout", label: "Home layout", icon: Rows3 },
+  { to: "/layout", label: "Screen layouts", icon: Rows3 },
+  { to: "/usage", label: "Feature usage", icon: BarChart3 },
   { to: "/banners", label: "Banners & ads", icon: Megaphone },
   { to: "/era-tips", label: "Your Era tips", icon: Orbit },
   { to: "/theme", label: "Theme", icon: Palette },

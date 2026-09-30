@@ -14,7 +14,7 @@ A web portal for staff to change what the Nura mobile app shows, without shippin
 | **App settings** | **Maintenance mode** (blocks the app) and **update prompts** (force below a minimum version, suggest below the latest) with store links |
 | **History** | Every publish is saved, and any section can be restored in one click |
 
-Launch states are designed in [docs/launch-states.md](docs/launch-states.md), which also holds the wire contract with the backend and the app.
+Launch states are designed in [docs/launch-states.md](docs/launch-states.md), which also holds the wire contract with the backend and the app. All docs: [docs/README.md](docs/README.md). How this fits with the app, API and Admin Workspace: the system [ARCHITECTURE.md](https://github.com/utkarshpayal/period-buddy/blob/main/docs/ARCHITECTURE.md).
 
 Every page previews its changes on a phone mock-up before you publish. Saved changes reach users the next time the app refreshes its config: on launch, when it returns to the foreground, or on pull-to-refresh on Home.
 

@@ -73,3 +73,17 @@ Static site, same as the Admin Website. `vercel.json` rewrites every path to `in
 
 - Set `VITE_API_BASE_URL` in the host's environment.
 - Add this site's origin to the backend's `ALLOWED_ORIGINS`, or the browser will block its API calls.
+
+## Install as an app
+
+The CMS is a PWA, so admins can install it from the browser: the install icon in
+Chrome/Edge's address bar, or **Share → Add to Home Screen** on iOS Safari. It
+opens in its own window with the Nura icon.
+
+- `public/manifest.webmanifest` holds the name, colours and icons (`public/icons/`).
+- `public/sw.js` caches only the app shell and hashed `/assets/*`. API calls and
+  sign-in always go to the network, so admins never see stale config. Bump
+  `CACHE` in `sw.js` if you ever need to force every installed copy to drop
+  its cache.
+- The service worker only registers in production builds (`npm run build`), and
+  installing needs HTTPS (or `localhost`).

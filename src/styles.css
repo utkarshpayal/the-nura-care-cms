@@ -644,6 +644,31 @@ textarea { width: 100%; resize: vertical; }
 .pv-sheet p { margin: 0; font-size: 0.62rem; line-height: 1.4; }
 .pv-sheet-btn { display: inline-flex; align-items: center; justify-content: center; gap: 4px; width: 100%; margin-top: 6px; padding: 7px; border-radius: 999px; font-size: 0.64rem; font-weight: 800; }
 .pv-sheet-close { font-size: 0.62rem; font-weight: 700; cursor: pointer; }
+/* Update prompt sheet (App settings) */
+.pv-update { position: relative; flex: 1; min-height: 0; }
+.pv-update-sheet { padding-bottom: 14px; }
+.pv-update-sheet > strong { font-size: 0.95rem; margin-top: 2px; }
+.pv-update-icon { position: relative; width: 52px; height: 52px; }
+.pv-update-icon img { width: 48px; height: 48px; border-radius: 14px; border: 1px solid; object-fit: cover; display: block; }
+.pv-update-icon i { position: absolute; right: 0; bottom: 0; width: 20px; height: 20px; border-radius: 50%; border: 2px solid; display: grid; place-items: center; }
+.pv-sheet .pv-update-version { padding: 2px 8px; border-radius: 999px; font-family: var(--font-mono); font-size: 0.6rem; }
+.pv-update-new { justify-self: stretch; display: grid; gap: 6px; text-align: left; margin-top: 4px; padding: 9px 10px; border: 1px solid; border-radius: 12px; }
+.pv-update-new b { font-size: 0.54rem; letter-spacing: 0.08em; }
+.pv-update-new span { display: flex; align-items: flex-start; gap: 6px; font-size: 0.62rem; line-height: 1.4; overflow-wrap: anywhere; }
+.pv-update-new span i { flex: none; width: 13px; height: 13px; border-radius: 50%; display: grid; place-items: center; margin-top: 1px; }
+.update-prompt { display: grid; gap: 12px; padding-top: 14px; border-top: 1px dashed var(--line); }
+.update-prompt h3 { font-size: 0.95rem; margin: 0; }
+.field-label-row { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.char-count { font-size: 0.72rem; font-weight: 700; color: var(--ink-4); font-variant-numeric: tabular-nums; }
+.char-count.is-over { color: var(--danger); }
+.highlight-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.highlight-list li { display: flex; align-items: center; gap: 6px; }
+.highlight-list input { flex: 1; min-width: 0; }
+.highlight-list .char-count { min-width: 44px; text-align: right; }
+.toggle-row { display: grid; gap: 2px; }
+.toggle-row p { margin: 0 0 0 46px; }
+.prompt-id-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 10px 12px; border-radius: var(--radius-md); background: var(--surface-2); border: 1px solid var(--line); }
+.prompt-id-row p { margin: 2px 0 0; }
 
 /* Sign-in code step */
 .btn-link { background: none; border: 0; padding: 0; font: inherit; font-weight: 600; color: var(--accent); cursor: pointer; }

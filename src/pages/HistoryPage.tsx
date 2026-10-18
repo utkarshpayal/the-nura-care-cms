@@ -46,6 +46,7 @@ const summarize = (r: Revision) => {
       const parts = [s.maintenance?.enabled ? "Maintenance ON" : "Maintenance off"];
       if (s.update?.minVersion) parts.push(`min v${s.update.minVersion}`);
       if (s.update?.latestVersion) parts.push(`latest v${s.update.latestVersion}`);
+      if (s.update?.forceShowAll) parts.push("update prompt for all");
       return parts.join(" · ");
     }
     default:

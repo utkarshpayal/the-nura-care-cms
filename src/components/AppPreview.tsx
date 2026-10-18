@@ -3,10 +3,13 @@ import {
   AlertCircle,
   Apple,
   ArrowRight,
+  ArrowUp,
+  ArrowUpCircle,
   BarChart3,
   BookOpen,
   BriefcaseMedical,
   Calendar,
+  Check,
   CheckCheck,
   ChevronLeft,
   ChevronRight,
@@ -53,7 +56,7 @@ import {
   type LucideIcon
 } from "lucide-react";
 import React, { createContext, useContext, useState } from "react";
-import type { Banner, CustomTile, Feature, FeaturePlacement, FeatureSize, HomeSection, Launch, LayoutScreen, ScreenSection, ThemeMode } from "../lib/api";
+import type { AppSettings, Banner, CustomTile, Feature, FeaturePlacement, FeatureSize, HomeSection, Launch, LayoutScreen, ScreenSection, ThemeMode } from "../lib/api";
 import { PLACEMENT_LABEL } from "../lib/catalog";
 
 /*
@@ -349,6 +352,60 @@ export const PopupPreview: React.FC<{ banner: Partial<Banner>; palette: Palette 
       <div className="pv-popup-actions">
         <span style={{ borderColor: palette.border, background: palette.surface, color: palette.foreground }}>{tappable ? "Not now" : "Close"}</span>
         {tappable && <span style={{ background: palette.button, color: palette.buttonText }}>{banner.ctaLabel || "Open"}</span>}
+      </div>
+    </div>
+  );
+};
+
+/**
+ * The "A new version is available" bottom sheet (period-buddy
+ * components/AppGate.tsx UpdateSheet), over a dimmed screen.
+ */
+export const UpdateSheetPreview: React.FC<{ update: AppSettings["update"]; palette: Palette }> = ({ update, palette }) => {
+  const highlights = update.highlights.map((h) => h.trim()).filter(Boolean);
+  const hasStore = Boolean(update.androidUrl || update.iosUrl);
+  return (
+    <div className="pv-update" style={{ background: palette.background }}>
+      <div className="pv-sheet-overlay">
+        <div className="pv-sheet pv-update-sheet" style={{ background: palette.surface, color: palette.foreground }}>
+          <span className="pv-sheet-grip" style={{ background: palette.border }} />
+          <span className="pv-update-icon">
+            <img src="/icons/icon-192.png" alt="" style={{ borderColor: palette.border, background: palette.surface }} />
+            <i style={{ background: palette.primary, color: palette.buttonText, borderColor: palette.surface }}>
+              <ArrowUp size={9} />
+            </i>
+          </span>
+          {update.latestVersion && (
+            <em className="pv-update-version" style={{ background: palette.primaryLight, color: palette.primary }}>
+              Version {update.latestVersion}
+            </em>
+          )}
+          <strong>{update.title.trim() || "A new version is available"}</strong>
+          <p style={{ color: palette.mutedText }}>{update.message.trim() || "Update The Nura to get the latest features and fixes."}</p>
+          {highlights.length > 0 && (
+            <div className="pv-update-new" style={{ background: palette.surfaceSoft, borderColor: palette.border }}>
+              <b style={{ color: palette.primary }}>WHAT&apos;S NEW</b>
+              {highlights.map((h, i) => (
+                <span key={`${i}-${h}`}>
+                  <i style={{ background: palette.primaryLight, color: palette.primary }}>
+                    <Check size={8} />
+                  </i>
+                  {h}
+                </span>
+              ))}
+            </div>
+          )}
+          {hasStore && (
+            <span className="pv-sheet-btn" style={{ background: palette.button, color: palette.buttonText }}>
+              <ArrowUpCircle size={10} /> {update.ctaLabel.trim() || "Update now"}
+            </span>
+          )}
+          {update.dismissible && (
+            <span className="pv-sheet-close" style={{ color: palette.mutedText }}>
+              Later
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

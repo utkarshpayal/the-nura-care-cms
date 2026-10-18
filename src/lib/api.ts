@@ -139,8 +139,33 @@ export type AppSettings = {
     message: string;
     androidUrl: string | null;
     iosUrl: string | null;
+    /** "What's new" points under the message: ≤ UPDATE_HIGHLIGHTS_MAX, each ≤ UPDATE_HIGHLIGHT_MAX_LENGTH; blanks are dropped on save. */
+    highlights: string[];
+    /** The primary button (≤24). */
+    ctaLabel: string;
+    /** false hides "Later" for people below latestVersion. */
+    dismissible: boolean;
+    /** true shows the prompt to every store-app user, whatever version. Needs a store link. */
+    forceShowAll: boolean;
+    /** The prompt shows once per id (≤40 of A-Z a-z 0-9 . _ -); null = once per latestVersion. */
+    promptId: string | null;
   };
 };
+
+/** Backend limits for the update prompt (period-buddy-be constants/appCatalog.js, utils/appConfig.js parseSettings). */
+export const UPDATE_HIGHLIGHTS_MAX = 5;
+export const UPDATE_HIGHLIGHT_MAX_LENGTH = 80;
+export const UPDATE_CTA_MAX_LENGTH = 24;
+export const UPDATE_PROMPT_ID = /^[A-Za-z0-9._-]{1,40}$/;
+
+/** The update-prompt fields added after launch, with the backend's defaults (DEFAULT_SETTINGS.update). */
+const UPDATE_PROMPT_DEFAULTS = { highlights: [] as string[], ctaLabel: "Update now", dismissible: true, forceShowAll: false, promptId: null as string | null };
+
+/** Settings with any field an older API omits filled in, so editors always have a value. */
+export const withSettingsDefaults = (s: AppSettings): AppSettings => ({
+  ...s,
+  update: { ...UPDATE_PROMPT_DEFAULTS, ...s.update, highlights: s.update?.highlights ?? [] }
+});
 
 export type Revision = {
   _id: string;

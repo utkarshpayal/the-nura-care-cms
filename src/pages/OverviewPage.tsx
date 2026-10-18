@@ -119,8 +119,13 @@ export const OverviewPage: React.FC = () => {
               <div>
                 <dt>Update prompts</dt>
                 <dd>
-                  {c.settings.update.minVersion || c.settings.update.latestVersion
-                    ? [c.settings.update.minVersion && `force below v${c.settings.update.minVersion}`, c.settings.update.latestVersion && `suggest below v${c.settings.update.latestVersion}`].filter(Boolean).join(" · ")
+                  {c.settings.update.minVersion || c.settings.update.latestVersion || c.settings.update.forceShowAll
+                    ? [
+                        c.settings.update.minVersion && `force below v${c.settings.update.minVersion}`,
+                        c.settings.update.forceShowAll ? "shown to all users" : c.settings.update.latestVersion && `suggest below v${c.settings.update.latestVersion}`
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")
                     : "Off"}
                 </dd>
               </div>

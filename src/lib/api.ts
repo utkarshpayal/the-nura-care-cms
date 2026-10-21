@@ -3,7 +3,19 @@
 //   /api/admin/me     refresh the signed-in staff member's permissions
 //   /api/cms/*        read/write the app config (cms.read / cms.manage)
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
+// Same backends and toggle as the mobile app (its app.json extra.apiBaseUrls).
+// VITE_API_BASE_URL, if set, wins; else VITE_APP_ENV picks one (vite.config.ts
+// defaults it from VERCEL_ENV: production → prod, preview → stage).
+const API_BASE_URLS = {
+  prod: "https://www.backend.thenura.care",
+  stage: "https://stage.backend.thenura.care"
+} as const;
+type AppEnv = keyof typeof API_BASE_URLS;
+const APP_ENV = import.meta.env.VITE_APP_ENV as string | undefined;
+const API_BASE = (
+  import.meta.env.VITE_API_BASE_URL ||
+  (APP_ENV && APP_ENV in API_BASE_URLS ? API_BASE_URLS[APP_ENV as AppEnv] : "")
+).replace(/\/$/, "");
 const TOKEN_KEY = "nura-cms.token";
 const TIMEOUT_MS = 20_000;
 
@@ -337,8 +349,15 @@ export const setToken = (token: string | null) => {
 
 export const isApiConfigured = () => Boolean(API_BASE);
 
+/** Which backend this build talks to, for the environment pill; null on prod. */
+export const backendLabel = (): string | null => {
+  if (!API_BASE || API_BASE === API_BASE_URLS.prod) return null;
+  if (API_BASE === API_BASE_URLS.stage) return "Staging";
+  return /\/\/(localhost|127\.0\.0\.1|\d+\.\d+\.\d+\.\d+)(:|\/|$)/.test(API_BASE) ? "Local" : "Custom backend";
+};
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  if (!API_BASE) throw new ApiError("VITE_API_BASE_URL is not set — see .env.example", 0);
+  if (!API_BASE) throw new ApiError("No backend set: VITE_APP_ENV or VITE_API_BASE_URL — see .env.example", 0);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   const headers = new Headers(init.headers);

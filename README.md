@@ -35,13 +35,16 @@ Requirements: Node.js 20 and npm.
 
 ```bash
 npm install
-cp .env.example .env      # set VITE_API_BASE_URL
+cp .env.example .env      # set VITE_APP_ENV or VITE_API_BASE_URL
 npm run dev               # http://localhost:5174
 ```
 
 | Key | Purpose |
 |---|---|
-| `VITE_API_BASE_URL` | Backend URL, e.g. `http://localhost:5000` or `https://www.backend.thenura.care` |
+| `VITE_APP_ENV` | `prod` (`https://www.backend.thenura.care`) or `stage` (`https://stage.backend.thenura.care`), the same backends as the mobile app. Unset on Vercel, it follows the deployment: Production → `prod`, Preview → `stage` |
+| `VITE_API_BASE_URL` | Any backend URL, e.g. `http://localhost:5000`. Wins over `VITE_APP_ENV` |
+
+Any backend other than production shows a **Staging** / **Local** / **Custom backend** pill next to the title, so nobody edits the wrong app config by mistake.
 
 ## Scripts
 
@@ -71,8 +74,8 @@ src/
 
 Static site, same as the Admin Website. `vercel.json` rewrites every path to `index.html`.
 
-- Set `VITE_API_BASE_URL` in the host's environment.
-- Add this site's origin to the backend's `ALLOWED_ORIGINS`, or the browser will block its API calls.
+- Production deploys (`main`) use the prod backend and Preview deploys, including the `staging` branch (the staging CMS), use the staging one with no settings (or set `VITE_APP_ENV` per environment). Don't set `VITE_API_BASE_URL` for all environments on Vercel: it would override this.
+- Add each deployment's origin to that backend's `ALLOWED_ORIGINS` (prod and staging each have their own), or the browser will block its API calls.
 
 ## Install as an app
 

@@ -90,3 +90,7 @@ opens in its own window with the Nura icon.
   its cache.
 - The service worker only registers in production builds (`npm run build`), and
   installing needs HTTPS (or `localhost`).
+
+## Contributing
+
+Branch from `staging`, open a PR to `staging`; releases are `staging` → `main` PRs ([WORKFLOW.md](https://github.com/utkarshpayal/period-buddy/blob/main/docs/WORKFLOW.md)). CI runs `npm ci` + `npm run build`. Never commit `.env*` files.

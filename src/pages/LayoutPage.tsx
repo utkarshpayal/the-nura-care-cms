@@ -185,7 +185,7 @@ export const LayoutPage: React.FC = () => {
     const common = { features: config!.features, links: config!.customTiles, banners, palette };
     if (screen === "home") return <HomeScreen {...common} sections={draft?.sections ?? []} mode={mode} hubTitles={hubTitles} />;
     if (screen === "profile") return <ProfileScreen {...common} sections={draft?.sections} />;
-    return <HubScreen {...common} placement={screen} sections={draft?.sections} title={draft?.title} />;
+    return <HubScreen {...common} placement={screen} sections={draft?.sections} title={draft?.title} mode={mode} />;
   };
 
   return (

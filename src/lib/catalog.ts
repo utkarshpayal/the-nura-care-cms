@@ -160,21 +160,84 @@ export const tokenByKey = (tokens: ThemeToken[]) => new Map(tokens.map((t) => [t
  * backend validates any path, so "Other screen…" allows ones not listed.
  */
 export const APP_DESTINATIONS: { value: string; label: string }[] = [
-  { value: "/subscription", label: "My subscription / plans" },
-  { value: "/consultation", label: "Book a consultation" },
+  // Tracking
   { value: "/tracker", label: "Cycle tracker" },
-  { value: "/insights", label: "Daily insights" },
+  { value: "/calendar", label: "Calendar" },
   { value: "/predictions", label: "Predictions" },
-  { value: "/community", label: "Community" },
+  { value: "/insights", label: "Daily insights" },
+  { value: "/symptom-predictions", label: "Symptom trends & body map" },
+  { value: "/graphs-reports", label: "Graphs & reports" },
+  { value: "/symptom-report", label: "Symptom report" },
+  // Care
+  { value: "/care-hub", label: "Care & Insights hub" },
+  { value: "/consultation", label: "Book a consultation" },
+  { value: "/symptom-checker", label: "Symptom checker" },
+  { value: "/documents", label: "Medical documents" },
+  // Wellness
+  { value: "/wellness-hub", label: "Wellness & Support hub" },
+  { value: "/qa", label: "Ask Nura AI" },
+  { value: "/health-issues", label: "Health concerns" },
+  { value: "/hygiene", label: "Hygiene" },
+  { value: "/sexual-wellbeing", label: "Sexual wellbeing" },
+  { value: "/checkin-call", label: "Check-in calls" },
+  // Explore
+  { value: "/explore-hub", label: "Explore hub" },
+  { value: "/forest", label: "Wellness forest" },
+  { value: "/habits", label: "Habits" },
   { value: "/blogs", label: "Blogs" },
   { value: "/reels", label: "Videos" },
-  { value: "/habits", label: "Habits" },
-  { value: "/forest", label: "Wellness forest" },
-  { value: "/qa", label: "Ask Nura AI" },
-  { value: "/symptom-checker", label: "Symptom checker" },
+  { value: "/community", label: "Community" },
+  { value: "/partner", label: "Partner sync" },
+  { value: "/buddy-nomination", label: "Period buddy" },
+  // Fun
+  { value: "/wrapped", label: "Cycle Wrapped" },
+  { value: "/era", label: "Your era" },
+  { value: "/badges", label: "Streaks & badges" },
+  { value: "/circles", label: "Bestie circles" },
+  // Account
+  { value: "/subscription", label: "My subscription / plans" },
   { value: "/government-schemes", label: "Government schemes" },
-  { value: "/checkin-call", label: "Check-in call" }
+  { value: "/notifications", label: "Notifications inbox" },
+  { value: "/notification-settings", label: "Notification settings" },
+  { value: "/customize-home", label: "Customize Home" },
+  { value: "/privacy", label: "Data privacy & security" },
+  { value: "/support-tickets", label: "Help & support tickets" }
 ];
+
+/**
+ * How the app lays out a hub (period-buddy lib/hubLayout.ts; keep in step):
+ * one feature is the hero card while it's open, and built-in features are
+ * grouped into titled sections drawn as a list (rows in one card) or tiles
+ * (two-column tinted cards). Anything else falls back to its size.
+ */
+export const HUB_HERO: Partial<Record<FeaturePlacement, string>> = {
+  care_hub: "consultation",
+  wellness_hub: "nuraAi"
+};
+
+export type HubSectionStyle = "list" | "tiles";
+export const HUB_SECTIONS: Partial<Record<FeaturePlacement, { id: string; title: string | null; style: HubSectionStyle; keys: string[] }[]>> = {
+  care_hub: [
+    { id: "understand", title: "Understand your cycle", style: "list", keys: ["predictions", "insights", "symptomTrends", "graphsReports"] },
+    { id: "tools", title: "Health tools", style: "tiles", keys: ["symptomChecker", "documents"] }
+  ],
+  wellness_hub: [
+    { id: "concerns", title: null, style: "list", keys: ["healthConcerns"] },
+    { id: "support", title: "More support", style: "list", keys: ["hygiene", "sexualWellbeing", "checkinCall"] }
+  ],
+  explore_hub: [
+    { id: "grow", title: "Grow", style: "tiles", keys: ["forest", "habits"] },
+    { id: "learn", title: "Learn", style: "tiles", keys: ["blogs", "videos"] },
+    { id: "connect", title: "Connect", style: "list", keys: ["partnerSync", "buddyNomination"] }
+  ]
+};
+
+/** Home's "More for you" row text for each hub when it holds its usual features (the app's describeHub fallbacks). */
+export const HUB_BLURB: Partial<Record<FeaturePlacement, string>> = {
+  care_hub: "Predictions, insights & doctors",
+  wellness_hub: "Nura AI, concerns & care",
+  explore_hub: "Forest, blogs, videos & habits"
+};
 
 export const HEX_OR_RGBA =
   /^(#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})|rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*(?:,\s*(?:0|1|0?\.\d+))?\s*\))$/i;

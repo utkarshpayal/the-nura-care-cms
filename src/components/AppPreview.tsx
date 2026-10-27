@@ -13,6 +13,12 @@ import {
   CheckCheck,
   ChevronLeft,
   ChevronRight,
+  CircleCheck,
+  Compass,
+  GalleryVerticalEnd,
+  HeartHandshake,
+  Lightbulb,
+  UserPlus,
   ClipboardList,
   Coins,
   Droplet,
@@ -57,7 +63,7 @@ import {
 } from "lucide-react";
 import React, { createContext, useContext, useState } from "react";
 import type { AppSettings, Banner, CustomTile, Feature, FeaturePlacement, FeatureSize, HomeSection, Launch, LayoutScreen, ScreenSection, ThemeMode } from "../lib/api";
-import { PLACEMENT_LABEL } from "../lib/catalog";
+import { HUB_BLURB, HUB_HERO, HUB_SECTIONS, PLACEMENT_LABEL, type HubSectionStyle } from "../lib/catalog";
 
 /*
  * A close-enough rendering of the app's Home, hub and Profile screens,
@@ -107,6 +113,11 @@ export const ICONS: Record<string, LucideIcon> = {
   "information-circle-outline": Info,
   "megaphone-outline": Megaphone,
   "trophy-outline": Trophy,
+  "bulb-outline": Lightbulb,
+  "heart-half-outline": HeartHandshake,
+  "checkmark-circle-outline": CircleCheck,
+  "person-add-outline": UserPlus,
+  "albums-outline": GalleryVerticalEnd,
   // Gen Z pack
   sparkles: Sparkles,
   "planet-outline": Orbit,
@@ -538,6 +549,144 @@ const Shortcuts: React.FC<{ tiles: PreviewTile[]; palette: Palette }> = ({ tiles
   );
 };
 
+/* ------------------------------ Hub layout ------------------------------ */
+
+type HubSection = { id: string; title: string | null; style: HubSectionStyle; tiles: PreviewTile[] };
+
+/** The app's arrangeHub (lib/hubLayout.ts): the hero while it's open, then titled sections, then the rest by size. */
+export const arrangeHub = (placement: FeaturePlacement, tiles: PreviewTile[]) => {
+  const heroKey = HUB_HERO[placement];
+  const hero = tiles.find((t) => t.key === heroKey && !t.lock) ?? null;
+  const defs = HUB_SECTIONS[placement] ?? [];
+  const sections: HubSection[] = [];
+  const byId = new Map<string, HubSection>();
+  for (const tile of tiles) {
+    if (tile === hero) continue;
+    const def = defs.find((d) => d.keys.includes(tile.key));
+    if (def) {
+      let section = byId.get(def.id);
+      if (!section) {
+        section = { id: def.id, title: def.title, style: def.style, tiles: [] };
+        byId.set(def.id, section);
+        sections.push(section);
+      }
+      section.tiles.push(tile);
+      continue;
+    }
+    const style: HubSectionStyle = tile.size === "large" ? "list" : "tiles";
+    const last = sections[sections.length - 1];
+    if (last && last.title === null && last.style === style && last.id.startsWith("more-")) last.tiles.push(tile);
+    else sections.push({ id: `more-${sections.length}`, title: null, style, tiles: [tile] });
+  }
+  return { hero, sections };
+};
+
+/** Care: the Book a call card. Wellness: Nura AI with its question box. */
+const HubHero: React.FC<{ tile: PreviewTile; placement: FeaturePlacement; palette: Palette; mode: ThemeMode }> = ({ tile, placement, palette, mode }) => {
+  const Icon = ICONS[tile.icon] ?? Sparkles;
+  const gradient =
+    mode === "dark" ? "linear-gradient(135deg, #9C3D68, #71347A 55%, #463A8A)" : `linear-gradient(135deg, ${palette.primary}, ${palette.primaryDark ?? palette.primary} 60%, #9C3A86)`;
+  const ask = placement === "wellness_hub";
+  return (
+    <div className="pv-hub-hero" style={{ background: gradient }}>
+      <div className="pv-hub-hero-top">
+        <span className="pv-hub-hero-icon">
+          <Icon size={14} />
+        </span>
+        <div>
+          <strong>{tile.title}</strong>
+          <span>{tile.description}</span>
+        </div>
+      </div>
+      {ask ? (
+        <div className="pv-ask">
+          <span>Ask anything about your body…</span>
+          <em style={{ background: palette.surface, color: palette.primary }}>
+            <ArrowUp size={10} />
+          </em>
+        </div>
+      ) : (
+        <span className="pv-hub-hero-btn" style={{ background: palette.surface, color: palette.primary }}>
+          <Phone size={10} /> Book a call
+        </span>
+      )}
+    </div>
+  );
+};
+
+/** A list section: rows in one card (the app's ListGroup). */
+const ListSection: React.FC<{ tiles: PreviewTile[]; palette: Palette }> = ({ tiles, palette }) => {
+  const openSheet = useContext(SheetContext);
+  return (
+    <div className="pv-list" style={{ background: palette.surface, borderColor: palette.border }}>
+      {tiles.map((tile) => {
+        const Icon = ICONS[tile.icon] ?? Sparkles;
+        const { fg, bg } = tint(palette, tile.colorKey);
+        return (
+          <div
+            key={tile.key}
+            className={`pv-list-row ${tile.lock === "soon" ? "is-locked" : ""} ${tile.sheet ? "is-tappable" : ""}`}
+            style={{ borderColor: palette.border }}
+            onClick={tile.sheet ? () => openSheet(tile) : undefined}
+          >
+            <span className="pv-list-icon" style={{ background: bg, color: fg }}>
+              <Icon size={12} />
+              {tile.lock === "paused" && (
+                <span className="pv-pause-dot" style={{ background: palette.warning, borderColor: palette.surface }}>
+                  <Pause size={5} />
+                </span>
+              )}
+            </span>
+            <span className="pv-tile-text">
+              <strong style={{ color: palette.foreground }}>
+                {tile.title}
+                <LaunchMark tile={tile} palette={palette} />
+                {!tile.lock && !tile.beta && tile.badge && (
+                  <em className="pv-badge" style={{ background: palette.primary, color: palette.buttonText }}>
+                    {tile.badge}
+                  </em>
+                )}
+              </strong>
+              <span style={{ color: palette.mutedText }}>{tile.description}</span>
+            </span>
+            {tile.lock !== "soon" && (tile.external ? <ExternalLink size={9} color={palette.mutedText} /> : <ChevronRight size={10} color={palette.mutedText} />)}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+/** A tiles section: two-column tinted cards. */
+const TileCards: React.FC<{ tiles: PreviewTile[]; palette: Palette }> = ({ tiles, palette }) => {
+  const openSheet = useContext(SheetContext);
+  return (
+    <div className="pv-grid">
+      {tiles.map((tile) => {
+        const Icon = ICONS[tile.icon] ?? Sparkles;
+        const { fg, bg } = tint(palette, tile.colorKey);
+        return (
+          <div
+            key={tile.key}
+            className={`pv-tilecard ${tile.lock === "soon" ? "is-locked" : ""} ${tile.sheet ? "is-tappable" : ""}`}
+            style={{ background: bg }}
+            onClick={tile.sheet ? () => openSheet(tile) : undefined}
+          >
+            <span className="pv-tile-icon" style={{ background: palette.surface, color: fg }}>
+              <Icon size={13} />
+            </span>
+            <strong style={{ color: palette.foreground }}>
+              {tile.title}
+              <LaunchMark tile={tile} palette={palette} />
+            </strong>
+            <span style={{ color: palette.mutedText }}>{tile.description}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
 /* --------------------------------- Screens -------------------------------- */
 
 type ScreenProps = {
@@ -566,7 +715,7 @@ const HUB_INTRO: Partial<Record<FeaturePlacement, string>> = {
   explore_hub: "Community, content, and everything to explore beyond tracking."
 };
 
-export const HubScreen: React.FC<ScreenProps & { placement: FeaturePlacement; sections?: ScreenSection[]; title?: string | null }> = ({
+export const HubScreen: React.FC<ScreenProps & { placement: FeaturePlacement; sections?: ScreenSection[]; title?: string | null; mode?: ThemeMode }> = ({
   placement,
   sections,
   title,
@@ -574,9 +723,11 @@ export const HubScreen: React.FC<ScreenProps & { placement: FeaturePlacement; se
   links,
   banners,
   palette,
-  viewAs
+  viewAs,
+  mode = "light"
 }) => {
   const tiles = tilesIn(features, links, placement, viewAs);
+  const arranged = arrangeHub(placement, tiles);
   const render = (key: string) => {
     switch (key) {
       case "intro":
@@ -589,7 +740,19 @@ export const HubScreen: React.FC<ScreenProps & { placement: FeaturePlacement; se
         return <BannerRow banners={liveBannersIn(banners, placement)} palette={palette} />;
       case "tiles":
         return tiles.length > 0 ? (
-          <TileGrid tiles={tiles} palette={palette} />
+          <div className="pv-hub">
+            {arranged.hero && <HubHero tile={arranged.hero} placement={placement} palette={palette} mode={mode} />}
+            {arranged.sections.map((section) => (
+              <div key={section.id}>
+                {section.title && (
+                  <div className="pv-section-title" style={{ color: palette.foreground }}>
+                    {section.title}
+                  </div>
+                )}
+                {section.style === "list" ? <ListSection tiles={section.tiles} palette={palette} /> : <TileCards tiles={section.tiles} palette={palette} />}
+              </div>
+            ))}
+          </div>
         ) : (
           <p className="pv-empty" style={{ color: palette.mutedText }}>
             Nothing here — this hub's card is hidden on Home.
@@ -616,7 +779,7 @@ export const HubScreen: React.FC<ScreenProps & { placement: FeaturePlacement; se
 
 const PROFILE_MENUS: Record<string, { title: string; rows: string[] }> = {
   account: { title: "Your account", rows: ["Achievements", "My subscription", "Government schemes & benefits"] },
-  preferences: { title: "Preferences", rows: ["Notifications & display"] },
+  preferences: { title: "Preferences", rows: ["Customize Home", "Notifications", "Display & community"] },
   privacyHelp: { title: "Privacy & help", rows: ["App lock", "Data privacy & security", "Help & support"] }
 };
 
@@ -695,6 +858,16 @@ export const ProfileScreen: React.FC<ScreenProps & { sections?: ScreenSection[] 
   );
 };
 
+/** The app's describeHub: its usual line while a hub holds its usual features, else the first titles. */
+const describeHub = (tiles: PreviewTile[], placement: FeaturePlacement) => {
+  const usual = [HUB_HERO[placement], ...(HUB_SECTIONS[placement] ?? []).flatMap((s) => s.keys)].filter(Boolean) as string[];
+  const keys = tiles.map((t) => t.key);
+  if (keys.length === usual.length && keys.every((k) => usual.includes(k))) return HUB_BLURB[placement] ?? "";
+  const titles = tiles.slice(0, 3).map((t) => t.title);
+  if (titles.length === 0) return HUB_BLURB[placement] ?? "";
+  return tiles.length > 3 ? `${titles.join(", ")} & more` : titles.length > 1 ? `${titles.slice(0, -1).join(", ")} & ${titles[titles.length - 1]}` : titles[0];
+};
+
 export const HomeScreen: React.FC<ScreenProps & { sections: HomeSection[]; mode: ThemeMode; showPopup?: boolean; hubTitles?: HubTitles }> = ({
   sections,
   hubTitles,
@@ -716,13 +889,15 @@ export const HomeScreen: React.FC<ScreenProps & { sections: HomeSection[]; mode:
     switch (key) {
       case "statPills":
         return (
-          <div className="pv-pills">
+          <div className="pv-statstrip" style={{ background: palette.surface, borderColor: palette.border }}>
             {[
-              { icon: Flame, label: "5 day streak" },
-              { icon: Coins, label: "120 points" }
-            ].map(({ icon: Icon, label }) => (
-              <span key={label} className="pv-pill" style={{ background: palette.surface, borderColor: palette.border, color: palette.foreground }}>
-                <Icon size={10} color={palette.primary} /> {label}
+              { icon: Flame, value: "5", label: "Day streak" },
+              { icon: Coins, value: "120", label: "Points" }
+            ].map(({ icon: Icon, value, label }) => (
+              <span key={label} style={{ borderColor: palette.border, color: palette.mutedText }}>
+                <Icon size={11} color={palette.primary} />
+                <b style={{ color: palette.foreground }}>{value}</b>
+                {label}
               </span>
             ))}
           </div>
@@ -755,21 +930,23 @@ export const HomeScreen: React.FC<ScreenProps & { sections: HomeSection[]; mode:
         );
       case "quickActions":
         return (
-          <div className="pv-actions">
+          <div className="pv-roundactions">
             {[
               { icon: Droplet, label: "Log period", primary: true },
               { icon: Activity, label: "Symptoms" },
               { icon: Smile, label: "Mood" }
             ].map(({ icon: Icon, label, primary }) => (
-              <span
-                key={label}
-                style={
-                  primary
-                    ? { background: palette.button, color: palette.buttonText }
-                    : { background: palette.surface, color: palette.foreground, borderColor: palette.border }
-                }
-              >
-                <Icon size={11} /> {label}
+              <span key={label} style={{ color: palette.foreground }}>
+                <em
+                  style={
+                    primary
+                      ? { background: palette.button, color: palette.buttonText }
+                      : { background: palette.surface, color: palette.primary, borderColor: palette.border }
+                  }
+                >
+                  <Icon size={14} />
+                </em>
+                {label}
               </span>
             ))}
           </div>
@@ -800,13 +977,24 @@ export const HomeScreen: React.FC<ScreenProps & { sections: HomeSection[]; mode:
             <div className="pv-section-title" style={{ color: palette.foreground }}>
               {textOf(sections, "moreForYou", "More for you")}
             </div>
-            {hubs.map((p) => (
-              <div key={p} className="pv-hub-row" style={{ background: palette.surface, borderColor: palette.border }}>
-                <strong style={{ color: palette.foreground }}>{hubTitles?.[p]?.trim() || PLACEMENT_LABEL[p]}</strong>
-                <span style={{ color: palette.mutedText }}>{tilesIn(features, links, p, viewAs).length} tiles</span>
-                <ArrowRight size={11} color={palette.primary} />
-              </div>
-            ))}
+            <div className="pv-list" style={{ background: palette.surface, borderColor: palette.border }}>
+              {hubs.map((p) => {
+                const Icon = p === "care_hub" ? Activity : p === "wellness_hub" ? Heart : Compass;
+                const { fg, bg } = tint(palette, p === "care_hub" ? "primary" : p === "wellness_hub" ? "secondary" : "accent");
+                return (
+                  <div key={p} className="pv-list-row" style={{ borderColor: palette.border }}>
+                    <span className="pv-list-icon" style={{ background: bg, color: fg }}>
+                      <Icon size={12} />
+                    </span>
+                    <span className="pv-tile-text">
+                      <strong style={{ color: palette.foreground }}>{hubTitles?.[p]?.trim() || PLACEMENT_LABEL[p]}</strong>
+                      <span style={{ color: palette.mutedText }}>{describeHub(tilesIn(features, links, p, viewAs), p)}</span>
+                    </span>
+                    <ChevronRight size={10} color={palette.mutedText} />
+                  </div>
+                );
+              })}
+            </div>
           </div>
         );
       }
@@ -848,5 +1036,5 @@ export const ScreenFor: React.FC<
   if (props.placement === "home") return <HomeScreen {...props} hubTitles={hubTitles} />;
   const sections = screenSections?.[props.placement];
   if (props.placement === "profile") return <ProfileScreen {...props} sections={sections} />;
-  return <HubScreen {...props} sections={sections} title={hubTitles?.[props.placement]} />;
+  return <HubScreen {...props} sections={sections} title={hubTitles?.[props.placement]} mode={props.mode} />;
 };

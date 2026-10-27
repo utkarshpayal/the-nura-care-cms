@@ -2,7 +2,7 @@
 // window opens fast; API calls (cross-origin, or /api/*) and non-GET requests
 // are never touched, so config edits and sign-in always hit the network.
 
-const CACHE = "nura-cms-v1";
+const CACHE = "nura-cms-v2";
 const SHELL = "/index.html";
 
 self.addEventListener("install", (event) => {

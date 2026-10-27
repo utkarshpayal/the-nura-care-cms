@@ -674,3 +674,33 @@ textarea { width: 100%; resize: vertical; }
 /* Sign-in code step */
 .btn-link { background: none; border: 0; padding: 0; font: inherit; font-weight: 600; color: var(--accent); cursor: pointer; }
 .btn-link:hover { text-decoration: underline; }
+
+/* ---- Previews that mirror the app's current look ---- */
+/* Hubs (app lib/hubLayout.ts): hero card, list sections, tinted tile cards */
+.pv-hub { display: grid; gap: 10px; }
+.pv-hub-hero { border-radius: 16px; padding: 12px; color: #fff; display: grid; gap: 10px; box-shadow: 0 6px 16px rgba(156, 58, 134, 0.25); }
+.pv-hub-hero-top { display: grid; grid-template-columns: auto 1fr; gap: 9px; align-items: center; }
+.pv-hub-hero-top strong { display: block; font-size: 0.78rem; }
+.pv-hub-hero-top span { font-size: 0.6rem; opacity: 0.88; }
+.pv-hub-hero-icon { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: rgba(255, 255, 255, 0.2); }
+.pv-hub-hero-btn { justify-self: start; display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 999px; font-size: 0.6rem; font-weight: 800; }
+.pv-ask { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 6px; padding: 6px 6px 6px 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.18); font-size: 0.6rem; }
+.pv-ask em { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-style: normal; }
+.pv-list { border-radius: 14px; border: 1px solid; overflow: hidden; }
+.pv-list-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 8px 10px; }
+.pv-list-row + .pv-list-row { border-top: 1px solid; }
+.pv-list-row.is-locked { opacity: 0.55; }
+.pv-list-row.is-tappable, .pv-tilecard.is-tappable { cursor: pointer; }
+.pv-list-icon { position: relative; width: 24px; height: 24px; border-radius: 8px; display: grid; place-items: center; }
+.pv-tilecard { display: grid; gap: 5px; align-content: start; padding: 10px; border-radius: 14px; min-width: 0; }
+.pv-tilecard.is-locked { opacity: 0.55; }
+.pv-tilecard strong { font-size: 0.68rem; }
+.pv-tilecard > span:last-child { font-size: 0.56rem; }
+/* Home: one stats card split into columns, round quick-log buttons */
+.pv-statstrip { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; border-radius: 14px; border: 1px solid; }
+.pv-statstrip span { display: grid; justify-items: center; gap: 1px; padding: 7px 4px; font-size: 0.56rem; }
+.pv-statstrip span + span { border-left: 1px solid; }
+.pv-statstrip b { font-size: 0.8rem; }
+.pv-roundactions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.pv-roundactions span { display: grid; justify-items: center; gap: 4px; font-size: 0.58rem; font-weight: 700; }
+.pv-roundactions em { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; border: 1px solid transparent; font-style: normal; }

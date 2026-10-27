@@ -19,6 +19,7 @@ import {
   Loader2,
   BarChart3
 } from "lucide-react";
+import { backendLabel } from "../lib/api";
 import { useAuth } from "../lib/store";
 import { staffName } from "../lib/catalog";
 
@@ -80,6 +81,7 @@ export const AppLayout: React.FC = () => {
           <div>
             <span>The Nura Care</span>
             <strong>App CMS</strong>
+            {backendLabel() && <em className="env-pill">{backendLabel()}</em>}
           </div>
         </div>
         <nav>

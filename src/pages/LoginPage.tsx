@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Loader2, LogIn } from "lucide-react";
-import { errorMessage, isApiConfigured, resendLoginCode, type LoginChallenge } from "../lib/api";
+import { backendLabel, errorMessage, isApiConfigured, resendLoginCode, type LoginChallenge } from "../lib/api";
 import { useAuth } from "../lib/store";
 
 export const LoginPage: React.FC = () => {
@@ -127,9 +127,9 @@ export const LoginPage: React.FC = () => {
     <div className="auth-page">
       <form className="auth-card" onSubmit={submit}>
         <img src="/logo.png" alt="" className="auth-logo" />
-        <h1>Nura App CMS</h1>
+        <h1>Nura App CMS {backendLabel() && <em className="env-pill">{backendLabel()}</em>}</h1>
         <p className="muted">Sign in with your Admin Workspace staff account.</p>
-        {!isApiConfigured() && <p className="notice notice-warn small">VITE_API_BASE_URL isn't set. Copy .env.example to .env.</p>}
+        {!isApiConfigured() && <p className="notice notice-warn small">No backend set (VITE_APP_ENV or VITE_API_BASE_URL). Copy .env.example to .env.</p>}
         {error && (
           <p className="notice notice-error small" role="alert">
             {error}
